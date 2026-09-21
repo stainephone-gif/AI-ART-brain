@@ -1,4 +1,4 @@
-# Установка на Windows 10. Запускать из PowerShell в корне репозитория:
+﻿# Установка на Windows 10. Запускать из PowerShell в корне репозитория:
 #   powershell -ExecutionPolicy Bypass -File install\install.ps1
 # Нужны: Python 3.11+ (с галочкой "Add to PATH"), git (необязательно).
 $ErrorActionPreference = "Stop"
