@@ -76,7 +76,7 @@ schedule:
 
 printer:
   enabled: true
-  name: "HP LaserJet 1018"           # имя принтера в Windows (Панель управления → Устройства и принтеры)
+  name: "HP LaserJet 1018"           # точное имя принтера в Windows (Get-Printer); "default" — принтер по умолчанию
   # Команда печати. {pdf} и {printer} подставляются. Windows: SumatraPDF (portable exe положить в install/).
   command: ["install/SumatraPDF.exe", "-print-to", "{printer}", "-silent", "-exit-when-done", "{pdf}"]
   # Linux (для отладки):  command: ["lp", "-d", "{printer}", "{pdf}"]

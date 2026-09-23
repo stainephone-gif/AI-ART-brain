@@ -7,6 +7,7 @@ Windows: команда печати — SumatraPDF (portable), Linux: lp. Ко�
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import subprocess
 import threading
@@ -56,9 +57,27 @@ class PrintQueue:
     def pending(self) -> List[Path]:
         return sorted(p for p in self.dir.glob("*.pdf") if p.is_file())
 
+    @staticmethod
+    def installed_printers() -> List[str]:
+        """Имена принтеров Windows (пустой список на других ОС или при ошибке)."""
+        if os.name != "nt":
+            return []
+        try:
+            r = subprocess.run(["powershell", "-NoProfile", "-Command", "Get-Printer | Select-Object -ExpandProperty Name"],
+                               capture_output=True, text=True, timeout=30)
+            return [ln.strip() for ln in r.stdout.splitlines() if ln.strip()]
+        except (OSError, subprocess.SubprocessError):
+            return []
+
     def _build_command(self, pdf: Path) -> List[str]:
         cmd = []
         for part in self.command:
+            if part == "-print-to" and self.name.lower() in ("", "default"):
+                # printer.name: default → печать на принтер по умолчанию
+                cmd.append("-print-to-default")
+                continue
+            if part == "{printer}" and self.name.lower() in ("", "default"):
+                continue
             part = part.replace("{pdf}", str(pdf)).replace("{printer}", self.name)
             if part.lower().endswith((".exe", "sumatrapdf")) and not Path(part).is_absolute():
                 part = str(resolve(self.cfg, part))
@@ -80,6 +99,13 @@ class PrintQueue:
                 r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
                 if r.returncode != 0:
                     self.last_error = f"код {r.returncode}: {(r.stderr or r.stdout)[:200]}"
+                    printers = self.installed_printers()
+                    if printers and self.name not in printers:
+                        self.last_error = (f"принтер «{self.name}» не найден в Windows. Установлены: "
+                                           + "; ".join(printers) + ". Впишите точное имя в config.yaml (printer.name) "
+                                           "или поставьте name: default")
+                    elif printers:
+                        self.last_error += " (принтер найден, но печать не прошла: проверьте, включён ли он и есть ли бумага)"
                     return False
             self.last_error = None
             return True
