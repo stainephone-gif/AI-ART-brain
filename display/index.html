@@ -46,6 +46,18 @@
   #debug .ev { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #badge { position: absolute; top: 2vh; right: 5vw; font-family: "Mono", monospace; font-size: 0.95vw; letter-spacing: .2em; color: var(--dim); border: 1px solid var(--line); padding: .3em .8em; display: none; }
   #badge.on { display: block; }
+  /* --- тестовый режим: протокол на экране --- */
+  #protocol { padding: 4vh 6vw 0; box-sizing: border-box; overflow: hidden; }
+  #pscroll { height: 100%; overflow: hidden; }
+  #protocol h1 { font-size: 1.6vw; font-weight: 700; margin: 0 0 .4vh; }
+  #protocol .meta { font-family: "Mono", monospace; font-size: 0.95vw; color: var(--dim); margin-bottom: 2.5vh; }
+  #protocol h2 { font-size: 1.05vw; font-weight: 700; letter-spacing: .06em; margin: 2.5vh 0 .8vh; color: var(--fg); }
+  #protocol .q { font-size: 1.25vw; line-height: 1.45; margin: 0 0 .3vh; }
+  #protocol .src, #protocol .ev { font-family: "Mono", monospace; font-size: 0.9vw; line-height: 1.6; color: var(--dim); }
+  #protocol .it { border-top: 1px solid var(--line); padding-top: 1.5vh; margin-top: 2.5vh; }
+  #protocol .it h2 { margin-top: 0; }
+  #protocol .txt { font-size: 1.2vw; line-height: 1.5; margin: .8vh 0 0; white-space: pre-wrap; }
+  #protocol .end { height: 40vh; }
   /* --- служебные --- */
   #status { display: flex; align-items: center; justify-content: center; font-family: "Mono", monospace; font-size: 1.3vw; color: var(--dim); letter-spacing: .1em; text-align: center; padding: 0 10vw; }
 </style>
@@ -63,6 +75,7 @@
     <svg id="traj" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet"></svg>
   </div>
   <div id="status" class="view"></div>
+  <div id="protocol" class="view"><div id="pscroll"></div></div>
   <div id="debug"></div>
   <div id="badge">ТЕСТ</div>
 </div>
@@ -168,6 +181,56 @@ function renderCycle(){
   drawTrajectory(iters, state.phase);
 }
 
+let lastCycle = null, lastCycleNo = null, scrollTimer = null, scrollPause = 0;
+
+async function loadLastCycle(){
+  try {
+    const rec = await fetchJSON("/last.json");
+    if (rec && rec.cycle) { lastCycle = rec; lastCycleNo = rec.cycle; renderProtocol(); }
+  } catch (e) {}
+}
+
+function renderProtocol(){
+  const rec = lastCycle;
+  const el = document.getElementById("pscroll");
+  if (!rec || !rec.cycle) { el.innerHTML = ""; return; }
+  const o = rec.outcome || {};
+  let h = `<h1>ПРОТОКОЛ ЦИКЛА ${pad(rec.cycle)}</h1>`;
+  h += `<div class="meta">${escapeHtml((rec.finished_at || "").replace("T", " "))} · исход ${o.outcome || ""} · ${escapeHtml(o.detail || "")} · итераций ${(rec.iterations || []).length} · ${rec.duration_s || ""} с · ${escapeHtml(rec.model || "")}</div>`;
+  h += `<h2>ПРИЗРАЧНЫЕ ЦИТАТЫ</h2>`;
+  for (const q of (rec.ghosts || {}).quotes || []) {
+    h += `<div class="q">«${escapeHtml(q.span)}»</div>`;
+    h += `<div class="src">${q.class || ""} · «${escapeHtml(q.title || "")}» · совпадение с текстом ${q.token_overlap ?? ""}</div>`;
+  }
+  for (const r of (rec.ghosts || {}).readings || []) {
+    h += `<div class="ev">текст ${r.text_id} «${escapeHtml(r.title || "")}»: фрагментов ${r.n_total}, верифицировано ${r.n_kept}, призрачных ${r.n_unverified}</div>`;
+  }
+  for (const it of rec.iterations || []) {
+    h += `<div class="it"><h2>ИТЕРАЦИЯ ${it.n} — ${it.primary} · ${NAMES[it.primary] || ""} · уверенность ${(it.confidence || 0).toFixed(2)} · фрагментов ${it.n_kept ?? 0} · слов ${it.n_words ?? ""}</h2>`;
+    for (const e of it.evidence || []) {
+      const m = e.mapping || {};
+      h += `<div class="ev">[${e.class}] «${escapeHtml(e.span)}» — ${escapeHtml(m.source || "")} → ${escapeHtml(m.target || "")}</div>`;
+    }
+    if ((it.unverified || []).length) h += `<div class="ev">не найдено в тексте: ${it.unverified.map(u => "«" + escapeHtml(u) + "»").join("; ")}</div>`;
+    h += `<div class="txt">${escapeHtml(it.text || "")}</div></div>`;
+  }
+  h += `<div class="end"></div>`;
+  el.innerHTML = h;
+  el.scrollTop = 0;
+  scrollPause = 120; // ~5 с паузы перед прокруткой
+}
+
+function startScroll(){
+  if (scrollTimer) return;
+  scrollTimer = setInterval(() => {
+    const el = document.getElementById("pscroll");
+    if (scrollPause > 0) { scrollPause--; return; }
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 2) { scrollPause = 200; el.scrollTop = 0; return; }
+    el.scrollTop += 1;
+  }, 40);
+}
+function stopScroll(){ if (scrollTimer) { clearInterval(scrollTimer); scrollTimer = null; } }
+
 function renderDebug(){
   const el = document.getElementById("debug");
   const on = !!state.test_mode;
@@ -201,14 +264,17 @@ function render(){
   const ph = state.phase || "idle";
   renderDebug();
   if (ph === "reading" || ph === "read" || ph === "rewriting" || ph === "writing") {
-    stopQuotes(); renderCycle(); show("cycle");
+    stopQuotes(); stopScroll(); renderCycle(); show("cycle");
   } else if (ph === "nointernet" || ph === "error") {
     stopQuotes();
     document.getElementById("status").textContent = state.message || PHASES[ph] || "";
     show("status");
+  } else if (state.test_mode && lastCycle && (ph === "idle" || ph === "offhours" || ph === "printing")) {
+    stopQuotes(); show("protocol"); startScroll();
+    document.getElementById("debug").classList.remove("on");
   } else {
     // idle, offhours, ghosts, printing — цитаты
-    show("quote"); startQuotes();
+    stopScroll(); show("quote"); startQuotes();
   }
 }
 
@@ -219,6 +285,7 @@ async function tick(){
     state = st;
     quoteSeconds = st.quote_seconds || quoteSeconds;
     if (changedCycle || !archive.cycles.length) { archive = await fetchJSON("/archive.json"); rebuildPool(); }
+    if (st.test_mode && (st.cycle !== lastCycleNo || (st.phase === "idle" && !lastCycle))) await loadLastCycle();
     render();
   } catch (e) { /* сервер перезапускается */ }
 }

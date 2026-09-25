@@ -34,6 +34,18 @@ def archive_quotes(cfg: Dict[str, Any], limit: int = 30) -> Dict[str, Any]:
     return {"cycles": cycles}
 
 
+def last_cycle(cfg: Dict[str, Any]) -> Dict[str, Any]:
+    """Полная запись последнего завершённого цикла (для протокола на экране в тестовом режиме)."""
+    d = path_dir(cfg, "archive")
+    files = sorted(d.glob("cycle_*.json"), reverse=True)
+    for f in files:
+        try:
+            return json.loads(f.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+    return {}
+
+
 class DisplayServer:
     def __init__(self, cfg: Dict[str, Any]):
         d = cfg.get("display", {})
@@ -90,6 +102,8 @@ class DisplayServer:
                     self._json(st)
                 elif p == "/archive.json":
                     self._json(archive_quotes(outer.cfg))
+                elif p == "/last.json":
+                    self._json(last_cycle(outer.cfg))
                 elif p.startswith("/fonts/") and ".." not in p:
                     self._file(outer.fonts_root / p[len("/fonts/"):], "font/ttf")
                 else:
