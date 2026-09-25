@@ -17,7 +17,7 @@ class Schedule:
         self.open = _parse(s.get("open", "11:00"))
         self.close = _parse(s.get("close", "20:00"))
         self.days = set(int(d) for d in s.get("days", [1, 2, 3, 4, 5, 6, 7]))
-        self.interval = timedelta(minutes=float(s.get("interval_minutes", 60)))
+        self.interval = timedelta(minutes=max(0.0, float(s.get("interval_minutes", 60))))
 
     def is_open(self, now: Optional[datetime] = None) -> bool:
         now = now or datetime.now()

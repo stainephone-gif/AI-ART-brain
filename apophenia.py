@@ -8,6 +8,7 @@
   python apophenia.py test-print          # напечатать пробный лист
   python apophenia.py models              # список моделей GigaChat, доступных по ключу
   python apophenia.py status              # состояние: последний цикл, очередь, расписание
+  python apophenia.py run --config config.test.yaml   # тестовый режим (test.bat): циклы подряд, свой архив и принтер
 Флаги: --config путь/к/config.yaml, --mock (заглушка вместо API и принтера), --scenario drift.
 """
 
@@ -33,7 +34,7 @@ from apophenia.moderation import Moderator
 from apophenia.printer import PrintQueue
 from apophenia.prompts import load_all
 from apophenia.schedule import Schedule
-from apophenia.sheet import render_sheet
+from apophenia.sheet import render_protocol, render_sheet
 from apophenia.state import State
 from apophenia.telegram import Notifier
 
@@ -82,7 +83,12 @@ class Service:
     def progress(self, **fields: Any) -> None:
         iters = fields.get("iterations")
         if iters is not None:
-            fields["iterations"] = [{"n": it["n"], "primary": it["primary"], "confidence": it["confidence"]} for it in iters]
+            debug = bool(self.cfg.get("display", {}).get("debug", False))
+            fields["iterations"] = [
+                {"n": it["n"], "primary": it["primary"], "confidence": it["confidence"],
+                 **({"evidence": it.get("evidence", []), "n_kept": it.get("n_kept", 0)} if debug else {})}
+                for it in iters]
+        fields.setdefault("test_mode", bool(self.cfg.get("display", {}).get("debug", False)))
         self.state.set_display(**fields)
 
     def run_cycle(self, do_print: bool = True) -> Optional[Dict[str, Any]]:
@@ -104,6 +110,7 @@ class Service:
         jpath = self.archive / f"cycle_{cycle_no:05d}.json"
         jpath.write_text(json.dumps(rec, ensure_ascii=False, indent=1), encoding="utf-8")
         pdf = render_sheet(rec, self.cfg, self.archive / f"cycle_{cycle_no:05d}.pdf")
+        protocol = render_protocol(rec, self.cfg, self.archive / f"cycle_{cycle_no:05d}_protocol.pdf")
         o = rec["outcome"]
         summary = (f"Цикл {cycle_no:05d}: {OUTCOMES.get(o['outcome'], o['outcome'])}"
                    f"{' — ' + o['class'] + ' (' + CLASS_NAMES_RU.get(o['class'], '') + ')' if o.get('class') else ''}, "
@@ -124,7 +131,9 @@ class Service:
             self.notifier.send(summary, "cycle_done")
         if do_print:
             self.queue.enqueue(pdf)
-        self.progress(phase="idle", cycle=cycle_no)
+            if self.cfg.get("printer", {}).get("protocol", False):
+                self.queue.enqueue(protocol)
+        self.progress(phase="idle", cycle=cycle_no, last_outcome=o)
         return rec
 
     # -- основной цикл службы -------------------------------------------------
@@ -134,8 +143,12 @@ class Service:
         self.state.data["started_at"] = datetime.now().isoformat(timespec="seconds")
         self.state.save()
         self.progress(phase="idle", cycle=self.state.data.get("last_cycle", 0))
+        sch = self.cfg.get("schedule", {})
         interval = self.schedule.interval.total_seconds()
-        next_at = time.time() if self.cfg.get("schedule", {}).get("start_immediately", True) else time.time() + interval
+        pause = float(sch.get("pause_seconds", 60))
+        max_cycles = int(sch.get("max_cycles", 0) or 0)
+        done_cycles = 0
+        next_at = time.time() if sch.get("start_immediately", True) else time.time() + interval
         while True:
             try:
                 if not self.schedule.is_open():
@@ -145,14 +158,21 @@ class Service:
                     time.sleep(min(wait, 300))
                     next_at = time.time()
                     continue
+                if max_cycles and done_cycles >= max_cycles:
+                    self.progress(phase="idle", message=f"выполнено {done_cycles} циклов, служба ждёт")
+                    time.sleep(30)
+                    continue
                 now = time.time()
                 if now < next_at:
                     self.progress(phase="idle", next_at=datetime.fromtimestamp(next_at).isoformat(timespec="minutes"))
                     time.sleep(min(30, next_at - now))
                     continue
                 started = time.time()
-                self.run_cycle()
-                next_at = max(started + interval, time.time() + 60)
+                if self.run_cycle() is not None:
+                    done_cycles += 1
+                    if max_cycles and done_cycles >= max_cycles:
+                        log.info("Выполнено %d циклов (schedule.max_cycles), новые не запускаются", done_cycles)
+                next_at = max(started + interval, time.time() + pause)
             except LLMError as e:
                 log.error("API недоступен: %s. Пауза 60 с", e)
                 self.progress(phase="nointernet", message="нет соединения")

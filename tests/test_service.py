@@ -27,3 +27,34 @@ def test_service_once_and_reprint(cfg, tmp_path, main_mod):
     main_mod.cmd_reprint(svc, 1, render_only=True)
     svc2 = main_mod.Service(cfg, mock=True, scenario="stabilize")
     assert svc2.run_cycle(do_print=False)["cycle"] == 2  # сквозная нумерация после перезапуска
+
+
+def test_config_extends(tmp_path):
+    from apophenia.config import ROOT, load_config
+    c = load_config(ROOT / "config.test.yaml")
+    assert c["schedule"]["interval_minutes"] == 0 and c["schedule"]["max_cycles"] == 5
+    assert c["paths"]["archive"] == "archive_test"
+    assert c["llm"]["model"] == load_config()["llm"]["model"]  # унаследовано
+    assert c["cycle"]["max_iterations"] == 25                    # унаследовано
+    assert "extends" not in c
+
+
+def test_protocol_pdf_and_protocol_print(cfg, tmp_path, main_mod):
+    cfg["printer"]["protocol"] = True
+    svc = main_mod.Service(cfg, mock=True, scenario="oscillate")
+    rec = svc.run_cycle(do_print=True)
+    archive = tmp_path / "archive"
+    proto = archive / "cycle_00001_protocol.pdf"
+    assert proto.exists() and proto.read_bytes().startswith(b"%PDF")
+    assert (tmp_path / "queue" / "cycle_00001_protocol.pdf").exists()
+    assert len(rec["iterations"]) == 6
+
+
+def test_debug_display_includes_evidence(cfg, tmp_path, main_mod):
+    cfg["display"]["debug"] = True
+    svc = main_mod.Service(cfg, mock=True, scenario="stabilize")
+    svc.run_cycle(do_print=False)
+    disp = json.loads((tmp_path / "state" / "display.json").read_text(encoding="utf-8"))
+    assert disp["test_mode"] is True
+    assert disp["iterations"][0]["evidence"]
+    assert disp["last_outcome"]["outcome"] == "STABILIZED"

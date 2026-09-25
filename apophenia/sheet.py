@@ -173,3 +173,48 @@ def render_sheet(rec: Dict[str, Any], cfg: Dict[str, Any], out_path: Path) -> Pa
             break
     out_path.write_bytes(best or b"")
     return out_path
+
+
+def render_protocol(rec: Dict[str, Any], cfg: Dict[str, Any], out_path: Path) -> Path:
+    """Протокол цикла для проверки алгоритма: все версии текста с прочтением каждой. Несколько страниц."""
+    from reportlab.platypus import PageBreak, SimpleDocTemplate
+
+    register_fonts(cfg)
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    st_h1 = ParagraphStyle("ph1", fontName="SansB", fontSize=12, leading=15)
+    st_meta = ParagraphStyle("pmeta", fontName="Mono", fontSize=7.5, leading=10, textColor=colors.Color(0.3, 0.3, 0.3))
+    st_sec = ParagraphStyle("psec", fontName="SansB", fontSize=9, leading=12, spaceBefore=8, spaceAfter=2)
+    st_body = ParagraphStyle("pbody", fontName="Sans", fontSize=9, leading=12.5, alignment=TA_JUSTIFY, spaceAfter=4)
+    st_ev = ParagraphStyle("pev", fontName="Sans", fontSize=7.5, leading=10, leftIndent=4 * mm,
+                           textColor=colors.Color(0.25, 0.25, 0.25), spaceAfter=1)
+    st_q = ParagraphStyle("pq", fontName="Sans", fontSize=8.5, leading=11, leftIndent=4 * mm, spaceAfter=1)
+
+    o = rec.get("outcome", {}) or {}
+    flow: List[Flowable] = [
+        Paragraph(f"ПРОТОКОЛ ЦИКЛА {rec['cycle']:05d} &nbsp;<font name='Mono' size='8'>{_esc(rec.get('finished_at', '').replace('T', ' '))}</font>", st_h1),
+        Paragraph(f"исход: {OUTCOMES.get(o.get('outcome', ''), o.get('outcome', ''))} — {_esc(o.get('detail', ''))} · "
+                  f"итераций: {len(rec.get('iterations', []))} · {rec.get('duration_s', '')} с · {_esc(rec.get('model', ''))}", st_meta),
+        Paragraph("ПРИЗРАЧНЫЕ ЦИТАТЫ", st_sec),
+    ]
+    for q in rec.get("ghosts", {}).get("quotes", []):
+        flow.append(Paragraph(f"«{_esc(q['span'])}» <font size='6.5' color='#777777'>· {q.get('class', '')} · «{_esc(q.get('title', ''))}» · "
+                              f"совпадение с текстом {q.get('token_overlap', '')}</font>", st_q))
+    for rd in rec.get("ghosts", {}).get("readings", []):
+        flow.append(Paragraph(f"текст {rd.get('text_id')} «{_esc(rd.get('title', ''))}»: фрагментов {rd.get('n_total')}, "
+                              f"верифицировано {rd.get('n_kept')}, призрачных {rd.get('n_unverified')}", st_ev))
+    for it in rec.get("iterations", []):
+        flow.append(Paragraph(f"ИТЕРАЦИЯ {it['n']} — прочитано как {it['primary']} ({CLASS_NAMES_RU.get(it['primary'], '')}), "
+                              f"уверенность {it['confidence']:.2f}, фрагментов {it.get('n_kept', 0)}, слов {it.get('n_words', '')}", st_sec))
+        for e in it.get("evidence", []):
+            m = e.get("mapping") or {}
+            flow.append(Paragraph(f"[{e['class']}] «{_esc(e['span'])}» — {_esc(m.get('source', ''))} → {_esc(m.get('target', ''))}", st_ev))
+        if it.get("unverified"):
+            flow.append(Paragraph("не найдено в тексте: " + "; ".join(f"«{_esc(u)}»" for u in it["unverified"]), st_ev))
+        for para in [p for p in (it.get("text") or "").split("\n") if p.strip()]:
+            flow.append(Paragraph(_esc(para.strip()), st_body))
+    doc = SimpleDocTemplate(str(out_path), pagesize=A4, leftMargin=15 * mm, rightMargin=15 * mm,
+                            topMargin=15 * mm, bottomMargin=15 * mm,
+                            title=f"Метасознание — протокол цикла {rec['cycle']:05d}")
+    doc.build(flow)
+    return out_path

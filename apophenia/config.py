@@ -11,11 +11,30 @@ import yaml
 ROOT = Path(__file__).resolve().parent.parent
 
 
+def _deep_merge(base: Dict[str, Any], over: Dict[str, Any]) -> Dict[str, Any]:
+    out = dict(base)
+    for k, v in over.items():
+        if isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = _deep_merge(out[k], v)
+        else:
+            out[k] = v
+    return out
+
+
 def load_config(path: str | Path | None = None) -> Dict[str, Any]:
+    """config.yaml; файл с ключом `extends: другой.yaml` наследует его и переопределяет только указанные поля."""
     path = Path(path) if path else ROOT / "config.yaml"
     path = path.resolve()
     with open(path, encoding="utf-8") as f:
         cfg = yaml.safe_load(f) or {}
+    parent = cfg.pop("extends", None)
+    if parent:
+        parent_path = Path(parent)
+        if not parent_path.is_absolute():
+            parent_path = path.parent / parent_path
+        base = load_config(parent_path)
+        base = {k: v for k, v in base.items() if not k.startswith("_")}
+        cfg = _deep_merge(base, cfg)
     cfg["_root"] = str(path.parent)
     cfg["_config_path"] = str(path)
     try:

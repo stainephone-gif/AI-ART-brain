@@ -25,6 +25,9 @@
   #head { grid-column: 1 / 3; font-family: "Mono", monospace; font-size: 1.15vw; color: var(--dim); letter-spacing: .06em; padding-bottom: 2.5vh; border-bottom: 1px solid var(--line); margin-bottom: 3vh; display: flex; justify-content: space-between; }
   #head b { color: var(--fg); font-weight: 400; }
   #text { font-size: 1.55vw; line-height: 1.5; overflow: hidden; white-space: pre-wrap; align-self: start; }
+  body.test #cycle { padding-bottom: 30vh; }
+  body.test #qcaption { bottom: 31vh; }
+  body.test #quote { padding-bottom: 30vh; }
   #text .cursor { display: inline-block; width: .55em; height: 1em; background: var(--fg); vertical-align: -0.15em; margin-left: .1em; animation: blink 1s steps(1) infinite; }
   @keyframes blink { 50% { opacity: 0; } }
   #traj { width: 100%; height: 100%; }
@@ -36,6 +39,13 @@
   #traj .dot.cur { fill: var(--accent); }
   #traj .ring { fill: none; stroke: var(--fg); stroke-width: 1; opacity: .5; }
   #traj .name { fill: var(--dim); }
+  /* --- тестовый режим: панель прочтения --- */
+  #debug { position: absolute; left: 5vw; right: 5vw; bottom: 3vh; max-height: 26vh; overflow: hidden; border-top: 1px solid var(--line); padding-top: 1.2vh; font-family: "Mono", monospace; font-size: 0.95vw; line-height: 1.5; color: var(--dim); display: none; }
+  #debug.on { display: block; }
+  #debug b { color: var(--fg); font-weight: 400; }
+  #debug .ev { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #badge { position: absolute; top: 2vh; right: 5vw; font-family: "Mono", monospace; font-size: 0.95vw; letter-spacing: .2em; color: var(--dim); border: 1px solid var(--line); padding: .3em .8em; display: none; }
+  #badge.on { display: block; }
   /* --- служебные --- */
   #status { display: flex; align-items: center; justify-content: center; font-family: "Mono", monospace; font-size: 1.3vw; color: var(--dim); letter-spacing: .1em; text-align: center; padding: 0 10vw; }
 </style>
@@ -53,6 +63,8 @@
     <svg id="traj" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet"></svg>
   </div>
   <div id="status" class="view"></div>
+  <div id="debug"></div>
+  <div id="badge">ТЕСТ</div>
 </div>
 <script>
 const CLASSES = ["COMP","IIT","PRED","GWT","ENACT","PAN","EMERG","UND"];
@@ -156,10 +168,38 @@ function renderCycle(){
   drawTrajectory(iters, state.phase);
 }
 
+function renderDebug(){
+  const el = document.getElementById("debug");
+  const on = !!state.test_mode;
+  document.body.classList.toggle("test", on);
+  document.getElementById("badge").classList.toggle("on", on);
+  if (!on) { el.classList.remove("on"); return; }
+  el.classList.add("on");
+  const iters = state.iterations || [];
+  const last = iters[iters.length - 1];
+  let html = "";
+  if (state.phase === "idle" || state.phase === "printing" || state.phase === "offhours") {
+    const o = state.last_outcome;
+    html += `<div>последний цикл <b>${pad(state.cycle || 0)}</b>` + (o ? ` · исход <b>${o.outcome}</b> ${o.detail ? "· " + escapeHtml(o.detail) : ""}` : "") +
+            (state.message ? ` · ${escapeHtml(state.message)}` : "") + `</div>`;
+    html += `<div>траектория: ${iters.map(i => i.primary).join(" → ") || "—"}</div>`;
+  } else if (last) {
+    html += `<div>итерация <b>${last.n}</b> · <b>${last.primary}</b> · уверенность <b>${(last.confidence || 0).toFixed(2)}</b> · фрагментов ${last.n_kept ?? (last.evidence || []).length}</div>`;
+    for (const e of (last.evidence || []).slice(0, 6)) {
+      const m = e.mapping || {};
+      html += `<div class="ev">[${e.class}] «${escapeHtml(e.span)}» — ${escapeHtml(m.source || "")} → ${escapeHtml(m.target || "")}</div>`;
+    }
+  } else {
+    html += `<div>${PHASES[state.phase] || ""}</div>`;
+  }
+  el.innerHTML = html;
+}
+
 function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
 function render(){
   const ph = state.phase || "idle";
+  renderDebug();
   if (ph === "reading" || ph === "read" || ph === "rewriting" || ph === "writing") {
     stopQuotes(); renderCycle(); show("cycle");
   } else if (ph === "nointernet" || ph === "error") {
