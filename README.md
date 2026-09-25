@@ -29,7 +29,7 @@
 переписывание с учётом прочтения (T=0.8) ◄── исход? STABILIZED / OSCILLATION / UNFINISHED
                                                  │
                                                  ▼
-                                  JSON + PDF в archive/ → очередь печати → HP LaserJet 1018
+                                  JSON + PDF в archive/ → очередь печати → Pantum P2500NW (USB)
 ```
 
 | Параметр | Значение (config.yaml) |
@@ -59,7 +59,7 @@ apophenia/
   cycle.py              один цикл: цитаты → экспликация → (чтение → переписывание)* → исход
   moderation.py         стоп-список + проверка моделью; помеченный текст переписывается, затем цикл отбрасывается
   sheet.py              лист А4 (PDF, reportlab, шрифты DejaVu из fonts/)
-  printer.py            очередь печати: queue/ → команда печати → queue/printed/
+  printer.py            очередь печати: queue/ → SumatraPDF → принтер; queue/printed/
   display.py            HTTP-сервер экрана: /, /state.json, /archive.json
   schedule.py, state.py, telegram.py
 prompts/
@@ -133,9 +133,9 @@ pytest
 
 ## Отличия от эскиза экспонирования
 
-- Мини-ПК на Windows 10, а не Linux: автозапуск через планировщик задач, печать через SumatraPDF.
+- Мини-ПК на Windows 10, а не Linux: автозапуск через планировщик задач, печать через SumatraPDF. Защитник Windows может ругаться на архив, см. install/README-windows.md.
 - Добавлен экран (горизонтальный, HDMI): цитаты в паузах, текст и траектория во время цикла. Питание и
   габариты в разделе «Оборудование» эскиза нужно дополнить.
 - Ритм один лист в час: расход бумаги ~8–10 листов в день вместо 40–100.
-- Принтер HP LaserJet 1018: только USB, ресурс картриджа 12A около 2000 страниц.
+- Принтер Pantum P2500NW вместо HP LaserJet 1018, подключение по USB, ресурс картриджа около 1600 страниц.
 - Модель GigaChat вместо Claude Sonnet.

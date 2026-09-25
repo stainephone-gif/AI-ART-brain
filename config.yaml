@@ -76,8 +76,9 @@ schedule:
 
 printer:
   enabled: true
-  name: "HP LaserJet 1018"           # точное имя принтера в Windows (Get-Printer); "default" — принтер по умолчанию
+  name: "Pantum P2500NW-series"           # точное имя принтера в Windows (Get-Printer); "default" — принтер по умолчанию
   # Команда печати. {pdf} и {printer} подставляются. Windows: SumatraPDF (portable exe положить в install/).
+  # Драйвер Pantum ставится с pantum.ru; в Windows 10 встроенного нет.
   command: ["install/SumatraPDF.exe", "-print-to", "{printer}", "-silent", "-exit-when-done", "{pdf}"]
   # Linux (для отладки):  command: ["lp", "-d", "{printer}", "{pdf}"]
   retry_seconds: 60

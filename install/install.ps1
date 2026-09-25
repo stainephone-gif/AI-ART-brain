@@ -35,7 +35,7 @@ if (-not (Test-Path $cer)) {
 }
 
 if (-not (Test-Path "install\SumatraPDF.exe")) {
-  Write-Host "Положите портативный SumatraPDF.exe в папку install\ (см. README) — он печатает PDF на HP LaserJet 1018"
+  Write-Host "Положите портативный SumatraPDF.exe в папку install\ (см. README) — он печатает PDF на принтер"
 }
 
 Write-Host "`nПроверка без API и принтера:  .\.venv\Scripts\python.exe apophenia.py once --mock"
