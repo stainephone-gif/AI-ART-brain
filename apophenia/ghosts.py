@@ -30,8 +30,16 @@ def collect_ghosts(cfg: Dict[str, Any], llm: BaseLLM, theory: Prompt, corpus: Li
         data = extract_json(resp.content)
         records, stats = validate_theory_response(data, t["text"], cfg.get("verification", {}))
         ghosts = [r for r in records if r.get("drop_reason") == "unverified"]
-        readings.append({"text_id": t["id"], "title": t["title"], "source": t["source"],
-                         "n_total": stats["n_total"], "n_kept": stats["n_kept"], "n_unverified": len(ghosts)})
+        reading = {"text_id": t["id"], "title": t["title"], "source": t["source"],
+                   "n_total": stats["n_total"], "n_kept": stats["n_kept"], "n_unverified": len(ghosts),
+                   "dropped": stats["dropped"], "finish_reason": resp.finish_reason}
+        if stats["n_total"] == 0:
+            # ничего не нашлось: сохраняем начало сырого ответа, чтобы понять, JSON это или отказ
+            reading["raw_preview"] = (resp.content or "")[:600]
+            reading["json_parsed"] = data is not None
+            log.warning("Текст %s: 0 фрагментов; JSON %s; ответ: %s", t["id"],
+                        "разобран" if data is not None else "НЕ разобран", (resp.content or "")[:200].replace("\n", " "))
+        readings.append(reading)
         for r in ghosts:
             quotes.append({
                 "span": r["span"], "class": r["class"], "mapping": r.get("mapping"), "level": r.get("level"),

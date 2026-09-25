@@ -8,6 +8,7 @@
   python apophenia.py test-print          # напечатать пробный лист
   python apophenia.py models              # список моделей GigaChat, доступных по ключу
   python apophenia.py status              # состояние: последний цикл, очередь, расписание
+  python apophenia.py probe [id]          # сырой ответ модели на один текст корпуса (отладка призрачных цитат)
   python apophenia.py run --config config.test.yaml   # тестовый режим (test.bat): циклы подряд, свой архив и принтер
 Флаги: --config путь/к/config.yaml, --mock (заглушка вместо API и принтера), --scenario drift.
 """
@@ -228,6 +229,31 @@ def cmd_test_print(svc: Service) -> None:
     print("Отправлено на печать" if ok else f"Ошибка печати: {svc.queue.last_error}")
 
 
+def cmd_probe(svc: Service, text_id: Optional[str]) -> None:
+    """Сырой ответ модели на один текст корпуса промптом классификатора при температуре призрачных цитат."""
+    from apophenia.llm import extract_json
+    from apophenia.reading import validate_theory_response
+    corpus = svc.corpus
+    t = next((x for x in corpus if text_id and str(x["id"]) == str(text_id)), None) or corpus[0]
+    theory = svc.prompts["theory"]
+    temp = float(svc.cfg["llm"].get("temperatures", {}).get("ghosts", 1.0))
+    print(f"Текст {t['id']} «{t['title']}», {t['n_words']} слов, температура {temp}")
+    print("-" * 60)
+    print(t["text"][:1500])
+    print("-" * 60)
+    resp = svc.llm.complete("ghosts", theory.system, theory.user(text=t["text"]), temp)
+    print(f"finish_reason: {resp.finish_reason}; usage: {resp.raw.get('usage')}")
+    print("СЫРОЙ ОТВЕТ:")
+    print(resp.content)
+    print("-" * 60)
+    data = extract_json(resp.content)
+    print("JSON разобран:", data is not None)
+    records, stats = validate_theory_response(data, t["text"], svc.cfg.get("verification", {}))
+    print(f"фрагментов {stats['n_total']}, верифицировано {stats['n_kept']}, отброшено {stats['dropped']}")
+    for r in records:
+        print(f"  [{r.get('class')}] {'OK ' if r['kept'] else r['drop_reason']:<22} «{r.get('span', '')[:90]}»")
+
+
 def cmd_status(svc: Service) -> None:
     st = svc.state.data
     print(f"Версия {__version__}; последний цикл: {st.get('last_cycle', 0)}; запуск службы: {st.get('started_at')}")
@@ -240,7 +266,7 @@ def cmd_status(svc: Service) -> None:
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description="Метасознание — служба инсталляции")
     ap.add_argument("command", nargs="?", default="run",
-                    choices=["run", "once", "reprint", "render", "test-print", "models", "status"])
+                    choices=["run", "once", "reprint", "render", "test-print", "models", "status", "probe"])
     ap.add_argument("arg", nargs="?")
     ap.add_argument("--config", default=None)
     ap.add_argument("--mock", action="store_true", help="заглушка вместо API и принтера")
@@ -270,6 +296,8 @@ def main(argv=None) -> None:
         cmd_test_print(svc)
     elif a.command == "status":
         cmd_status(svc)
+    elif a.command == "probe":
+        cmd_probe(svc, a.arg)
 
 
 if __name__ == "__main__":
