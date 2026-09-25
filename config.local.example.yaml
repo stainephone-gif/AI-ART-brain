@@ -1,0 +1,12 @@
+# Локальные настройки этого компьютера. Скопировать в config.local.yaml (в git не попадает) и править только его.
+# Всё, что здесь не указано, берётся из config.yaml. Тестовый режим (config.test.yaml) тоже видит эти настройки.
+extends: config.yaml
+
+printer:
+  name: "Pantum P2500NW-series"      # точное имя принтера в Windows: Get-Printer
+
+schedule:
+  open: "11:00"
+  close: "20:00"
+  days: [1, 2, 3, 4, 5, 6, 7]
+  interval_minutes: 60

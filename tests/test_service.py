@@ -58,3 +58,21 @@ def test_debug_display_includes_evidence(cfg, tmp_path, main_mod):
     assert disp["test_mode"] is True
     assert disp["iterations"][0]["evidence"]
     assert disp["last_outcome"]["outcome"] == "STABILIZED"
+
+
+def test_config_local_overrides(tmp_path, monkeypatch):
+    from apophenia import config as cmod
+    import shutil
+    for name in ("config.yaml", "config.test.yaml"):
+        shutil.copy(cmod.ROOT / name, tmp_path / name)
+    (tmp_path / "config.local.yaml").write_text("extends: config.yaml\nprinter:\n  name: LOCAL\nschedule:\n  open: '09:00'\n", encoding="utf-8")
+    c = cmod.load_config(tmp_path / "config.yaml")
+    assert c["printer"]["name"] == "LOCAL" and c["schedule"]["open"] == "09:00"
+    assert c["llm"]["model"]  # остальное из config.yaml
+    t = cmod.load_config(tmp_path / "config.test.yaml")
+    assert t["schedule"]["open"] == "00:00"          # тестовый конфиг переопределяет расписание
+    assert t["printer"]["name"] != "LOCAL"           # и принтер (свой тестовый)
+    assert t["display"]["debug"] is True
+    # без локального файла всё по-прежнему
+    (tmp_path / "config.local.yaml").unlink()
+    assert cmod.load_config(tmp_path / "config.yaml")["printer"]["name"] == "Pantum P2500NW-series"

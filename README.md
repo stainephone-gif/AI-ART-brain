@@ -51,6 +51,7 @@ apophenia.py            служба: run / once / reprint / render / test-print
 start.bat, stop.bat     ручной запуск и остановка службы вместе с экраном (Windows)
 test.bat, config.test.yaml   тестовый режим: циклы подряд, свой архив и принтер, протоколы, отладочный экран
 config.yaml             все настройки (модель, пороги, расписание, принтер, экран)
+config.local.yaml       локальные переопределения этого компьютера (не в git), образец config.local.example.yaml
 .env                    секреты: GIGACHAT_CREDENTIALS, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (из .env.example)
 apophenia/
   llm.py                клиент GigaChat (OAuth, повторы, цензура) и MockLLM для проверки без API
@@ -104,6 +105,30 @@ python apophenia.py once --mock --scenario drift      # сценарии: stabil
 python apophenia.py run --mock                        # служба целиком; экран: http://127.0.0.1:8765/
 pytest
 ```
+
+## Локальные настройки и обновление через git
+
+Настройки конкретного компьютера (имя принтера, часы галереи) лучше держать не в `config.yaml`, а в
+`config.local.yaml`: скопировать `config.local.example.yaml`, вписать своё. Файл в git не попадает, программа
+берёт его автоматически, тестовый режим тоже. Тогда `config.yaml` остаётся нетронутым, и обновление кода
+сводится к одной команде:
+
+```
+git pull
+```
+
+Если папка проекта была распакована из ZIP, один раз превратить её в репозиторий (нужен Git for Windows):
+
+```
+git init
+git remote add origin https://github.com/stainephone-gif/AI-ART-brain
+git fetch origin
+git checkout -f -B main origin/main
+```
+
+Файлы, которых нет в git (`.env`, `config.local.yaml`, `install\SumatraPDF.exe`, сертификат, архивы), при этом
+не трогаются; изменённые файлы из репозитория (например, правленный вручную `config.yaml`) перезаписываются,
+поэтому свои правки сначала перенести в `config.local.yaml`.
 
 ## Тестовый режим
 
