@@ -76,3 +76,13 @@ def test_config_local_overrides(tmp_path, monkeypatch):
     # без локального файла всё по-прежнему
     (tmp_path / "config.local.yaml").unlink()
     assert cmod.load_config(tmp_path / "config.yaml")["printer"]["name"] == "Pantum P2500NW-series"
+
+
+def test_gdi_backend_error_outside_windows(cfg, tmp_path):
+    import os
+    from apophenia.printer import PrintQueue
+    cfg["printer"].update({"enabled": True, "backend": "gdi", "name": "X"})
+    q = PrintQueue(cfg)
+    pdf = tmp_path / "a.pdf"; pdf.write_bytes(b"%PDF-1.4\n")
+    if os.name != "nt":
+        assert q.print_file(pdf) is False and "gdi" in q.last_error

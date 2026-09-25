@@ -26,6 +26,8 @@ class PrintQueue:
         self.enabled = bool(p.get("enabled", True))
         self.name = str(p.get("name", ""))
         self.command: List[str] = list(p.get("command", []))
+        self.backend = str(p.get("backend", "command")).lower()   # command (SumatraPDF/lp) | gdi (Windows, без внешних программ)
+        self.dpi = int(p.get("gdi_dpi", 300))
         self.retry = float(p.get("retry_seconds", 60))
         self.copies = int(p.get("copies", 1))
         self.cfg = cfg
@@ -86,9 +88,20 @@ class PrintQueue:
 
     def print_file(self, pdf: Path) -> bool:
         """Печать одного файла. Возвращает True при успехе (файл ушёл в спулер)."""
-        if not self.enabled or not self.command:
+        if not self.enabled or (self.backend == "command" and not self.command):
             log.info("Печать отключена, файл считается напечатанным: %s", pdf.name)
             return True
+        if self.backend == "gdi":
+            try:
+                print_pdf_gdi(pdf, self.name, self.dpi, self.copies)
+                self.last_error = None
+                return True
+            except Exception as e:  # noqa: BLE001
+                self.last_error = f"gdi: {e}"
+                printers = self.installed_printers()
+                if printers and self.name not in printers and self.name.lower() not in ("", "default"):
+                    self.last_error += ". Установлены: " + "; ".join(printers)
+                return False
         cmd = self._build_command(pdf)
         exe = Path(cmd[0])
         if exe.suffix.lower() == ".exe" and not exe.exists():
@@ -145,3 +158,47 @@ class PrintQueue:
                     reported = True
                 self._wake.wait(timeout=self.retry)
                 self._wake.clear()
+
+
+def print_pdf_gdi(pdf: Path, printer_name: str, dpi: int = 300, copies: int = 1) -> None:
+    """Печать PDF средствами Windows: страницы растрируются (pypdfium2) и рисуются на принтер через GDI (pywin32).
+
+    Не зависит от внешних программ и работает с любым драйвером, который умеет печатать картинки.
+    Пакеты: pypdfium2, pillow, pywin32 (ставятся из requirements.txt на Windows).
+    """
+    if os.name != "nt":
+        raise RuntimeError("печать через GDI доступна только в Windows")
+    import pypdfium2 as pdfium  # noqa: PLC0415
+    import win32print  # noqa: PLC0415
+    import win32ui  # noqa: PLC0415
+    from PIL import ImageWin  # noqa: PLC0415
+
+    name = printer_name
+    if not name or name.lower() == "default":
+        name = win32print.GetDefaultPrinter()
+    doc = pdfium.PdfDocument(str(pdf))
+    hdc = win32ui.CreateDC()
+    hdc.CreatePrinterDC(name)
+    HORZRES, VERTRES, PHYSICALWIDTH, PHYSICALHEIGHT, PHYSICALOFFSETX, PHYSICALOFFSETY = 8, 10, 110, 111, 112, 113
+    pw, ph = hdc.GetDeviceCaps(HORZRES), hdc.GetDeviceCaps(VERTRES)
+    try:
+        hdc.StartDoc(f"Метасознание {pdf.name}")
+        for _ in range(max(1, copies)):
+            for page in doc:
+                img = page.render(scale=dpi / 72).to_pil().convert("RGB")
+                ratio = min(pw / img.width, ph / img.height)
+                w, h = int(img.width * ratio), int(img.height * ratio)
+                x, y = (pw - w) // 2, (ph - h) // 2
+                hdc.StartPage()
+                ImageWin.Dib(img).draw(hdc.GetHandleOutput(), (x, y, x + w, y + h))
+                hdc.EndPage()
+        hdc.EndDoc()
+    except Exception:
+        try:
+            hdc.AbortDoc()
+        except Exception:  # noqa: BLE001
+            pass
+        raise
+    finally:
+        hdc.DeleteDC()
+        doc.close()
