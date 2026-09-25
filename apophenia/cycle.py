@@ -102,7 +102,7 @@ class Engine:
 
         # 1. Призрачные цитаты
         progress(phase="ghosts", cycle=cycle_no, iterations=[], quotes=[])
-        ghosts = collect_ghosts(self.cfg, self.llm, self.prompts["theory"], self.corpus, seed)
+        ghosts = collect_ghosts(self.cfg, self.llm, self.prompts.get("ghosts", self.prompts["theory"]), self.corpus, seed)
         quotes = ghosts["quotes"]
         record["ghosts"] = ghosts
         min_q = int(self.cfg.get("ghosts", {}).get("min_quotes", 3))

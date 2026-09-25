@@ -91,4 +91,7 @@ def class_definition(cfg: Dict[str, Any], cls: str) -> str:
 
 
 def load_all(cfg: Dict[str, Any]) -> Dict[str, Prompt]:
-    return {k: load_prompt(cfg, k) for k in ("theory", "explicate", "rewrite", "moderate")}
+    out = {k: load_prompt(cfg, k) for k in ("theory", "explicate", "rewrite", "moderate")}
+    # промпт призрачных цитат; если не задан — тот же промпт, что у классификатора
+    out["ghosts"] = load_prompt(cfg, "ghosts") if cfg["prompts"].get("ghosts") else out["theory"]
+    return out

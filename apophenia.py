@@ -235,7 +235,7 @@ def cmd_probe(svc: Service, text_id: Optional[str]) -> None:
     from apophenia.reading import validate_theory_response
     corpus = svc.corpus
     t = next((x for x in corpus if text_id and str(x["id"]) == str(text_id)), None) or corpus[0]
-    theory = svc.prompts["theory"]
+    theory = svc.prompts.get("ghosts", svc.prompts["theory"])
     temp = float(svc.cfg["llm"].get("temperatures", {}).get("ghosts", 1.0))
     print(f"Текст {t['id']} «{t['title']}», {t['n_words']} слов, температура {temp}")
     print("-" * 60)

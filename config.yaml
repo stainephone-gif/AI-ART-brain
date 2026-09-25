@@ -34,7 +34,8 @@ corpus:
 prompts:
   dir: prompts
   codebook: codebook.md
-  theory: theory_v3.md               # тот же промпт, что в исследовании AI-art
+  theory: theory_v3.md               # классификатор: тот же строгий промпт, что в исследовании AI-art
+  ghosts: ghosts_v1.md               # призрачные цитаты: тот же кодбук и формат, но жадное чтение (не менее 4 фрагментов)
   explicate: explicate_v1.md
   rewrite: rewrite_v1.md
   moderate: moderate_v1.md
