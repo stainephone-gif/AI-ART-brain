@@ -76,8 +76,12 @@ class Service:
         self.display = DisplayServer(cfg)
         self.archive = path_dir(cfg, "archive")
         self.rejected = path_dir(cfg, "rejected")
-        log.info("Корпус: %d текстов; модель: %s; принтер: %s", len(self.corpus),
-                 getattr(self.llm, "model", "mock"), cfg["printer"].get("name") if cfg["printer"].get("enabled") else "выключен")
+        local = Path(cfg["_root"]) / "config.local.yaml"
+        log.info("Конфиг: %s%s; корпус: %d текстов; модель: %s; принтер: %s (%s)",
+                 Path(cfg["_config_path"]).name, " + config.local.yaml" if local.exists() else "",
+                 len(self.corpus), getattr(self.llm, "model", "mock"),
+                 cfg["printer"].get("name") if cfg["printer"].get("enabled") else "выключен",
+                 "gdi, средствами Windows" if self.queue.backend == "gdi" else "SumatraPDF/команда")
 
     # -- один цикл ------------------------------------------------------------
     def progress(self, **fields: Any) -> None:
