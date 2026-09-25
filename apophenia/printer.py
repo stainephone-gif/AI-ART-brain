@@ -20,13 +20,27 @@ from .config import path_dir, resolve
 log = logging.getLogger("apophenia.printer")
 
 
+def _gdi_available() -> bool:
+    try:
+        import pypdfium2  # noqa: F401, PLC0415
+        import win32print  # noqa: F401, PLC0415
+        import win32ui  # noqa: F401, PLC0415
+        from PIL import ImageWin  # noqa: F401, PLC0415
+        return True
+    except ImportError:
+        return False
+
+
 class PrintQueue:
     def __init__(self, cfg: Dict[str, Any], on_error: Optional[Callable[[str], None]] = None):
         p = cfg.get("printer", {})
         self.enabled = bool(p.get("enabled", True))
         self.name = str(p.get("name", ""))
         self.command: List[str] = list(p.get("command", []))
-        self.backend = str(p.get("backend", "command")).lower()   # command (SumatraPDF/lp) | gdi (Windows, без внешних программ)
+        # auto: в Windows печать средствами системы (gdi), если стоят pypdfium2 и pywin32; иначе внешняя команда (SumatraPDF/lp)
+        self.backend = str(p.get("backend", "auto")).lower()
+        if self.backend == "auto":
+            self.backend = "gdi" if (os.name == "nt" and _gdi_available()) else "command"
         self.dpi = int(p.get("gdi_dpi", 300))
         self.retry = float(p.get("retry_seconds", 60))
         self.copies = int(p.get("copies", 1))

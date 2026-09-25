@@ -77,7 +77,7 @@ schedule:
 printer:
   enabled: true
   name: "Pantum P2500NW-series"           # точное имя принтера в Windows (Get-Printer); "default" — принтер по умолчанию
-  backend: command                   # command — внешняя команда ниже (SumatraPDF); gdi — средствами Windows без SumatraPDF
+  backend: auto                      # auto — в Windows средствами системы (gdi), если стоят pypdfium2 и pywin32, иначе command; command — SumatraPDF/lp; gdi — принудительно
   gdi_dpi: 300
   # Команда печати. {pdf} и {printer} подставляются. Windows: SumatraPDF (portable exe положить в install/).
   # Драйвер Pantum ставится с pantum.ru; в Windows 10 встроенного нет.

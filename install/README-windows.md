@@ -17,10 +17,9 @@
 3. Скачать **портативный** SumatraPDF (файл `SumatraPDF-*-64.exe`, https://www.sumatrapdfreader.org/download-free-pdf-viewer),
    переименовать в `SumatraPDF.exe` и положить в папку `install\`.
 4. Пробный лист: `.venv\Scripts\python.exe apophenia.py test-print`.
-5. Если SumatraPDF возвращает «код 1» при правильном имени принтера, проверить его вручную без тихого режима:
-   `install\SumatraPDF.exe -print-to "<имя>" queue\test_sheet.pdf` (покажет окно с ошибкой). Если и так не печатает,
-   переключиться на печать средствами Windows: в `config.local.yaml` в блоке `printer` написать `backend: gdi`
-   и выполнить `.venv\Scripts\python.exe -m pip install -r requirements.txt` (доставит pypdfium2, pillow, pywin32).
+5. Способ печати выбирается сам (`printer.backend: auto`): если установлены пакеты pypdfium2, pillow и pywin32
+   (ставятся из requirements.txt), печать идёт средствами Windows без SumatraPDF; иначе через SumatraPDF.
+   Принудительно: `backend: command` или `backend: gdi` в `config.local.yaml`. Строка запуска показывает, какой способ активен.
 
 Замятие: открыть крышку, вынуть лист, закрыть; задание остаётся в очереди Windows и допечатается само.
 Кончилась бумага: добавить бумагу, принтер продолжит сам. Служба хранит свою очередь в `queue\`,
