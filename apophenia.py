@@ -237,7 +237,8 @@ def cmd_probe(svc: Service, text_id: Optional[str]) -> None:
     t = next((x for x in corpus if text_id and str(x["id"]) == str(text_id)), None) or corpus[0]
     theory = svc.prompts.get("ghosts", svc.prompts["theory"])
     temp = float(svc.cfg["llm"].get("temperatures", {}).get("ghosts", 1.0))
-    print(f"Текст {t['id']} «{t['title']}», {t['n_words']} слов, температура {temp}")
+    model = getattr(svc.llm, "models", {}).get("ghosts", getattr(svc.llm, "model", "mock"))
+    print(f"Текст {t['id']} «{t['title']}», {t['n_words']} слов, температура {temp}, модель {model}")
     print("-" * 60)
     print(t["text"][:1500])
     print("-" * 60)
@@ -248,10 +249,14 @@ def cmd_probe(svc: Service, text_id: Optional[str]) -> None:
     print("-" * 60)
     data = extract_json(resp.content)
     print("JSON разобран:", data is not None)
-    records, stats = validate_theory_response(data, t["text"], svc.cfg.get("verification", {}))
-    print(f"фрагментов {stats['n_total']}, верифицировано {stats['n_kept']}, отброшено {stats['dropped']}")
+    vcfg = {**svc.cfg.get("verification", {}), **(svc.cfg.get("ghosts", {}).get("verification") or {})}
+    records, stats = validate_theory_response(data, t["text"], vcfg)
+    print(f"фрагментов {stats['n_total']}, в тексте есть {stats['n_kept']}, призрачных {stats['dropped'].get('unverified', 0)}, "
+          f"прочее {dict((k, v) for k, v in stats['dropped'].items() if k != 'unverified')}")
     for r in records:
-        print(f"  [{r.get('class')}] {'OK ' if r['kept'] else r['drop_reason']:<22} «{r.get('span', '')[:90]}»")
+        v = r.get("verification") or {}
+        tag = "ЕСТЬ   " if r["kept"] else ("ПРИЗРАК" if r["drop_reason"] == "unverified" else r["drop_reason"])
+        print(f"  [{r.get('class')}] {tag:<22} совпадение {v.get('token_overlap', '-')}  «{r.get('span', '')[:90]}»")
 
 
 def cmd_status(svc: Service) -> None:

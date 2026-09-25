@@ -91,6 +91,8 @@ class GigaChatClient(BaseLLM):
     def __init__(self, cfg: Dict[str, Any]):
         llm = cfg["llm"]
         self.model = llm.get("model", "GigaChat-2-Max")
+        # модель по ролям: llm.models: {ghosts: GigaChat-2, ...}; не указанные роли берут llm.model
+        self.models: Dict[str, str] = {k: str(v) for k, v in (llm.get("models") or {}).items() if v}
         self.auth_url = llm.get("auth_url", "https://ngw.devices.sberbank.ru:9443/api/v2/oauth")
         self.base_url = llm.get("base_url", "https://gigachat.devices.sberbank.ru/api/v1").rstrip("/")
         self.scope = llm.get("scope", "GIGACHAT_API_PERS")
@@ -153,7 +155,7 @@ class GigaChatClient(BaseLLM):
     def complete(self, role: str, system: str, user: str, temperature: float) -> LLMResponse:
         import requests
         payload: Dict[str, Any] = {
-            "model": self.model,
+            "model": self.models.get(role, self.model),
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
             "max_tokens": self.max_tokens,
         }

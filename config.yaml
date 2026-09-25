@@ -4,6 +4,8 @@
 llm:
   provider: gigachat                 # gigachat | mock (детерминированная заглушка без API и без принтера)
   model: GigaChat-2-Max              # проверить доступные имена: python apophenia.py models
+  models:                            # модель по ролям; не указанные роли берут model выше
+    ghosts: GigaChat-2               # чтение корпуса: модель слабее, она чаще «дочитывает» лишнее
   auth_url: https://ngw.devices.sberbank.ru:9443/api/v2/oauth
   base_url: https://gigachat.devices.sberbank.ru/api/v1
   scope: GIGACHAT_API_PERS           # GIGACHAT_API_PERS | GIGACHAT_API_B2B | GIGACHAT_API_CORP
@@ -43,7 +45,10 @@ prompts:
 ghosts:
   min_quotes: 3                      # минимум призрачных цитат на цикл
   max_quotes: 8
-  max_texts_per_cycle: 6             # сколько кураторских текстов читать, пока не наберётся min_quotes
+  max_texts_per_cycle: 8             # сколько кураторских текстов читать, пока не наберётся min_quotes
+  verification:                      # что считать «фразой, которой в тексте нет» (переопределяет verification ниже)
+    require_exact: true              # призрак — любая цитата, которой нет в тексте дословно (с точностью до регистра и пунктуации)
+    # token_overlap_threshold: 0.9   # альтернатива: мягче — призрак, если совпало меньше 90 % слов
 
 verification:                        # как в AI-art config.yaml
   token_overlap_threshold: 0.7

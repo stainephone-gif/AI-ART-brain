@@ -17,6 +17,8 @@ log = logging.getLogger("apophenia.ghosts")
 def collect_ghosts(cfg: Dict[str, Any], llm: BaseLLM, theory: Prompt, corpus: List[Dict[str, Any]], seed: int) -> Dict[str, Any]:
     g = cfg.get("ghosts", {})
     min_q, max_q = int(g.get("min_quotes", 3)), int(g.get("max_quotes", 8))
+    # верификация для этой роли: по умолчанию как в исследовании, но ghosts.verification переопределяет
+    vcfg = {**cfg.get("verification", {}), **(g.get("verification") or {})}
     temp = float(cfg["llm"].get("temperatures", {}).get("ghosts", 1.0))
     texts = pick_texts(corpus, int(g.get("max_texts_per_cycle", 6)), seed=seed)
     quotes: List[Dict[str, Any]] = []
@@ -28,7 +30,7 @@ def collect_ghosts(cfg: Dict[str, Any], llm: BaseLLM, theory: Prompt, corpus: Li
             log.warning("Текст %s: отказ модели (%s), пропускаем", t["id"], e)
             continue
         data = extract_json(resp.content)
-        records, stats = validate_theory_response(data, t["text"], cfg.get("verification", {}))
+        records, stats = validate_theory_response(data, t["text"], vcfg)
         ghosts = [r for r in records if r.get("drop_reason") == "unverified"]
         reading = {"text_id": t["id"], "title": t["title"], "source": t["source"],
                    "n_total": stats["n_total"], "n_kept": stats["n_kept"], "n_unverified": len(ghosts),
