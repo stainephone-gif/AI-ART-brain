@@ -74,6 +74,14 @@ def extract_json(content: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+def clean_credentials(raw: str) -> str:
+    """Ключ из .env: без кавычек, без хвоста-комментария после #, без пробелов по краям."""
+    v = (raw or "").strip()
+    if "#" in v:
+        v = v.split("#", 1)[0].strip()
+    return v.strip("\"'").strip()
+
+
 class BaseLLM:
     def complete(self, role: str, system: str, user: str, temperature: float) -> LLMResponse:
         raise NotImplementedError
@@ -91,10 +99,13 @@ class GigaChatClient(BaseLLM):
         self.delay = float(llm.get("request_delay", 1.0))
         self.max_tokens = int(llm.get("max_tokens", 3000))
         cred_env = llm.get("credentials_env", "GIGACHAT_CREDENTIALS")
-        self.credentials = os.getenv(cred_env, "")
+        self.credentials = clean_credentials(os.getenv(cred_env, ""))
         if not self.credentials:
             raise RuntimeError(f"Не задан {cred_env} (Authorization key GigaChat). Положите его в .env "
                                "или используйте llm.provider: mock.")
+        if not self.credentials.isascii() or " " in self.credentials:
+            raise RuntimeError(f"{cred_env} в .env содержит недопустимые символы (русские буквы, пробелы, кавычки). "
+                               "Ключ — одна длинная строка из латинских букв, цифр, «+», «/», «=», без комментария на той же строке.")
         self.verify: Any = bool(llm.get("verify_ssl", True))
         ca = llm.get("ca_bundle")
         if self.verify and ca:
@@ -117,8 +128,11 @@ class GigaChatClient(BaseLLM):
             "Content-Type": "application/x-www-form-urlencoded",
             "Accept": "application/json",
         }
-        r = requests.post(self.auth_url, headers=headers, data={"scope": self.scope},
-                          timeout=self.timeout, verify=self.verify)
+        try:
+            r = requests.post(self.auth_url, headers=headers, data={"scope": self.scope},
+                              timeout=self.timeout, verify=self.verify)
+        except (requests.RequestException, UnicodeEncodeError, ValueError) as e:
+            raise LLMError(f"OAuth GigaChat: {e}") from e
         if r.status_code != 200:
             raise LLMError(f"OAuth GigaChat: HTTP {r.status_code}: {r.text[:200]}")
         data = r.json()

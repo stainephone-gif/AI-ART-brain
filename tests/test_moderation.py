@@ -23,3 +23,10 @@ def test_moderator_disabled(cfg):
     cfg["moderation"]["enabled"] = False
     m = Moderator(cfg, MockLLM(), None)
     assert m.check("Путин")["ok"]
+
+
+def test_clean_credentials():
+    from apophenia.llm import clean_credentials
+    assert clean_credentials('  abc==   # Authorization key из кабинета ') == "abc=="
+    assert clean_credentials('"abc=="') == "abc=="
+    assert clean_credentials("") == ""
