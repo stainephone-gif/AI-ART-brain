@@ -48,6 +48,7 @@ UND (свидетельств ни одной теории нет) не стаб
 
 ```
 apophenia.py            служба: run / once / reprint / render / test-print / models / status
+start.bat, stop.bat     ручной запуск и остановка службы вместе с экраном (Windows)
 config.yaml             все настройки (модель, пороги, расписание, принтер, экран)
 .env                    секреты: GIGACHAT_CREDENTIALS, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (из .env.example)
 apophenia/
@@ -90,6 +91,9 @@ notepad .env                                                     # GIGACHAT_CRED
 .venv\Scripts\python.exe apophenia.py once                       # один настоящий цикл сейчас
 powershell -ExecutionPolicy Bypass -File install\register_task.ps1   # автозапуск службы и экрана
 ```
+
+Ручной запуск на выставочном компьютере: двойной щелчок по `start.bat` (служба в свёрнутом окне плюс экран),
+`stop.bat` останавливает и то, и другое. Для автономной работы вместо этого регистрируется автозапуск (`install\register_task.ps1`).
 
 Проверка на любой машине без API и принтера:
 
