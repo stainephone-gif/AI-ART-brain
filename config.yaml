@@ -75,10 +75,11 @@ moderation:
 
 schedule:
   interval_minutes: 60               # один цикл (один лист) в час
-  open: "11:00"
+  always: true                       # часов работы нет: циклы идут всё время, пока включён компьютер (розетка с таймером)
+  open: "11:00"                      # действуют только при always: false
   close: "20:00"
   days: [1, 2, 3, 4, 5, 6, 7]        # 1 = понедельник
-  start_immediately: true            # первый цикл сразу после запуска в рабочие часы
+  start_immediately: true            # первый цикл сразу после запуска
 
 printer:
   enabled: true

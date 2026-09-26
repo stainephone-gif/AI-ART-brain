@@ -7,7 +7,7 @@ printer:
   # backend: command                 # принудительно SumatraPDF; по умолчанию auto (средствами Windows, если стоят пакеты)
 
 schedule:
-  open: "11:00"
-  close: "20:00"
-  days: [1, 2, 3, 4, 5, 6, 7]
-  interval_minutes: 60
+  interval_minutes: 60               # один лист в час, пока включён компьютер
+  # always: false                    # если нужны часы работы вместо таймера-розетки:
+  # open: "11:00"
+  # close: "20:00"

@@ -5,7 +5,7 @@ from apophenia.schedule import Schedule
 
 
 def test_schedule_open_hours(cfg):
-    cfg["schedule"].update({"open": "11:00", "close": "20:00", "days": [1, 2, 3, 4, 5]})
+    cfg["schedule"].update({"always": False, "open": "11:00", "close": "20:00", "days": [1, 2, 3, 4, 5]})
     s = Schedule(cfg)
     assert s.is_open(datetime(2026, 9, 21, 12, 0))       # понедельник
     assert not s.is_open(datetime(2026, 9, 21, 20, 0))   # закрытие не включительно
@@ -86,3 +86,9 @@ def test_gdi_backend_error_outside_windows(cfg, tmp_path):
     pdf = tmp_path / "a.pdf"; pdf.write_bytes(b"%PDF-1.4\n")
     if os.name != "nt":
         assert q.print_file(pdf) is False and "gdi" in q.last_error
+
+
+def test_schedule_always(cfg):
+    cfg["schedule"].update({"always": True, "open": "11:00", "close": "12:00", "days": [1]})
+    s = Schedule(cfg)
+    assert s.is_open(datetime(2026, 9, 26, 3, 0)) and s.seconds_until_open(datetime(2026, 9, 26, 3, 0)) == 0.0
