@@ -17,7 +17,7 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
-from reportlab.platypus import Flowable, Frame, KeepTogether, Paragraph, Spacer
+from reportlab.platypus import Flowable, Frame, Paragraph, Spacer
 
 from . import ALL_CLASSES, CLASS_NAMES_RU, OUTCOMES
 from .config import resolve
@@ -43,33 +43,35 @@ def _esc(s: str) -> str:
 class Trajectory(Flowable):
     """Сетка: строки — восемь классов, столбцы — итерации; точка в классе итерации, размер по уверенности."""
 
-    def __init__(self, classes: List[str], confidences: List[float], width: float, row_h: float = 4.6 * mm):
+    def __init__(self, classes: List[str], confidences: List[float], width: float, scale: float = 1.0):
         super().__init__()
         self.classes = classes
         self.confidences = confidences
         self.w = width
-        self.row_h = row_h
-        self.label_w = 54 * mm
-        self.h = row_h * len(ALL_CLASSES) + 8 * mm
+        self.k = scale
+        self.row_h = 4.6 * mm * scale
+        self.label_w = 54 * mm * scale
+        self.h = self.row_h * len(ALL_CLASSES) + 8 * mm * scale
 
     def wrap(self, availWidth, availHeight):
         return self.w, self.h
 
     def draw(self):
         c = self.canv
+        k = self.k
         n = max(1, len(self.classes))
         grid_w = self.w - self.label_w - 4 * mm
-        step = min(9 * mm, grid_w / n)
-        top = self.h - 3 * mm
-        c.setFont("Sans", 6.5)
+        step = min(9 * mm * k, grid_w / n)
+        top = self.h - 3 * mm * k
+        c.setFont("Sans", 6.5 * k)
         c.setStrokeColor(colors.Color(0.82, 0.82, 0.82))
         c.setLineWidth(0.3)
         for i, cls in enumerate(ALL_CLASSES):
             y = top - i * self.row_h - self.row_h / 2
             c.setFillColor(colors.black)
-            c.drawString(0, y - 2, f"{cls}")
+            c.drawString(0, y - 2 * k, f"{cls}")
             c.setFillColor(colors.Color(0.45, 0.45, 0.45))
-            c.drawString(11 * mm, y - 2, CLASS_NAMES_RU[cls])
+            c.drawString(11 * mm * k, y - 2 * k, CLASS_NAMES_RU[cls])
             c.line(self.label_w, y, self.label_w + step * n, y)
         pts = []
         for j, cls in enumerate(self.classes):
@@ -78,37 +80,38 @@ class Trajectory(Flowable):
             y = top - i * self.row_h - self.row_h / 2
             pts.append((x, y))
         c.setStrokeColor(colors.black)
-        c.setLineWidth(0.6)
+        c.setLineWidth(0.6 * k)
         for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
             c.line(x1, y1, x2, y2)
         for (x, y), conf in zip(pts, self.confidences):
-            r = 0.6 * mm + 1.1 * mm * float(conf)
+            r = (0.6 * mm + 1.1 * mm * float(conf)) * k
             c.setFillColor(colors.black)
             c.circle(x, y, r, stroke=0, fill=1)
-        c.setFont("Mono", 5.5)
+        c.setFont("Mono", 5.5 * k)
         c.setFillColor(colors.Color(0.45, 0.45, 0.45))
-        yb = top - len(ALL_CLASSES) * self.row_h - 3 * mm
+        yb = top - len(ALL_CLASSES) * self.row_h - 3 * mm * k
         for j, (x, _) in enumerate(pts):
             c.drawCentredString(x, yb, str(j + 1))
         c.setFillColor(colors.black)
 
 
-def _flowables(rec: Dict[str, Any], cfg: Dict[str, Any], body_size: float, width: float) -> List[Flowable]:
+def _flowables(rec: Dict[str, Any], cfg: Dict[str, Any], k: float, width: float) -> List[Flowable]:
+    """Все элементы листа в масштабе k (k = 1 — базовые кегли: текст 10 pt, цитаты 8.5 pt, шапка 13 pt)."""
     s = cfg.get("sheet", {})
-    st_h1 = ParagraphStyle("h1", fontName="SansB", fontSize=13, leading=16)
-    st_meta = ParagraphStyle("meta", fontName="Mono", fontSize=7.5, leading=10, textColor=colors.Color(0.3, 0.3, 0.3))
-    st_sec = ParagraphStyle("sec", fontName="SansB", fontSize=8, leading=11, spaceBefore=5, textColor=colors.black)
-    st_quote = ParagraphStyle("q", fontName="Sans", fontSize=8.5, leading=11, leftIndent=4 * mm, spaceAfter=1)
-    st_src = ParagraphStyle("src", fontName="Sans", fontSize=6.5, leading=8.5, leftIndent=4 * mm,
-                            textColor=colors.Color(0.45, 0.45, 0.45), spaceAfter=2.5)
-    st_body = ParagraphStyle("body", fontName="Sans", fontSize=body_size, leading=body_size * 1.32, alignment=TA_JUSTIFY, spaceAfter=body_size * 0.6)
-    st_foot = ParagraphStyle("foot", fontName="Mono", fontSize=6.5, leading=8.5, textColor=colors.Color(0.4, 0.4, 0.4))
+    g = colors.Color(0.45, 0.45, 0.45)
+    st_h1 = ParagraphStyle("h1", fontName="SansB", fontSize=13 * k, leading=16 * k)
+    st_meta = ParagraphStyle("meta", fontName="Mono", fontSize=7.5 * k, leading=10 * k, textColor=colors.Color(0.3, 0.3, 0.3))
+    st_sec = ParagraphStyle("sec", fontName="SansB", fontSize=8 * k, leading=11 * k, spaceBefore=6 * k, spaceAfter=1.5 * k)
+    st_quote = ParagraphStyle("q", fontName="Sans", fontSize=8.5 * k, leading=11.5 * k, leftIndent=4 * mm * k, spaceAfter=1 * k)
+    st_src = ParagraphStyle("src", fontName="Sans", fontSize=6.5 * k, leading=8.5 * k, leftIndent=4 * mm * k, textColor=g, spaceAfter=3 * k)
+    st_body = ParagraphStyle("body", fontName="Sans", fontSize=10 * k, leading=13.5 * k, alignment=TA_JUSTIFY, spaceAfter=6 * k)
+    st_foot = ParagraphStyle("foot", fontName="Mono", fontSize=6.5 * k, leading=8.5 * k, textColor=colors.Color(0.4, 0.4, 0.4))
 
     out: List[Flowable] = []
     o = rec.get("outcome", {}) or {}
     oname = OUTCOMES.get(o.get("outcome", ""), o.get("outcome", ""))
     when = rec.get("finished_at", "").replace("T", " ")
-    out.append(Paragraph(f"{_esc(s.get('title', 'МЕТАСОЗНАНИЕ'))} &nbsp;&nbsp;<font name='Mono' size='9'>цикл {rec['cycle']:05d}</font>", st_h1))
+    out.append(Paragraph(f"{_esc(s.get('title', 'МЕТАСОЗНАНИЕ'))} &nbsp;&nbsp;<font name='Mono' size='{9 * k:.1f}'>цикл {rec['cycle']:05d}</font>", st_h1))
     outcome_line = f"{when} &nbsp;·&nbsp; исход: {oname.upper()}"
     if o.get("outcome") == "STABILIZED":
         outcome_line += f" — {o.get('class')} ({CLASS_NAMES_RU.get(o.get('class', ''), '')})"
@@ -118,7 +121,7 @@ def _flowables(rec: Dict[str, Any], cfg: Dict[str, Any], body_size: float, width
         outcome_line += " — " + ("вырождение текста" if o.get("reason") == "degenerate" else "потолок итераций")
     outcome_line += f" &nbsp;·&nbsp; итераций: {len(rec.get('iterations', []))}"
     out.append(Paragraph(outcome_line, st_meta))
-    out.append(Spacer(1, 2 * mm))
+    out.append(Spacer(1, 3 * mm * k))
 
     out.append(Paragraph("ПРИЗРАЧНЫЕ ЦИТАТЫ — прочитаны моделью в кураторских текстах, в текстах не найдены", st_sec))
     for q in rec.get("ghosts", {}).get("quotes", []):
@@ -133,7 +136,7 @@ def _flowables(rec: Dict[str, Any], cfg: Dict[str, Any], body_size: float, width
         out.append(Paragraph(src, st_src))
 
     out.append(Paragraph("ТРАЕКТОРИЯ ДРЕЙФА — как классификатор прочитывал каждую версию текста", st_sec))
-    out.append(Trajectory(rec.get("trajectory", []), rec.get("confidences", []), width))
+    out.append(Trajectory(rec.get("trajectory", []), rec.get("confidences", []), width, scale=k))
 
     out.append(Paragraph("САМОЭКСПЛИКАЦИЯ — последняя версия", st_sec))
     for para in [p for p in (rec.get("final_text") or "").split("\n") if p.strip()]:
@@ -142,8 +145,9 @@ def _flowables(rec: Dict[str, Any], cfg: Dict[str, Any], body_size: float, width
     foot = (f"{rec.get('model', '')} · промпт классификатора {rec.get('prompts', {}).get('theory', {}).get('hash', '')} "
             f"· кодбук {rec.get('prompts', {}).get('theory', {}).get('codebook_hash', '')} · {rec.get('code_version', '')} "
             f"· {rec.get('duration_s', '')} с")
-    out.append(KeepTogether([Spacer(1, 2 * mm), Paragraph(_esc(foot), st_foot),
-                             Paragraph(_esc(s.get("footer", "")), st_foot)]))
+    out.append(Spacer(1, 3 * mm * k))
+    out.append(Paragraph(_esc(foot), st_foot))
+    out.append(Paragraph(_esc(s.get("footer", "")), st_foot))
     return out
 
 
@@ -155,22 +159,27 @@ def render_sheet(rec: Dict[str, Any], cfg: Dict[str, Any], out_path: Path) -> Pa
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     page_w, page_h = A4
-    margin = 15 * mm
+    margin = float(cfg.get("sheet", {}).get("margin_mm", 16)) * mm
     width, height = page_w - 2 * margin, page_h - 2 * margin
+    s = cfg.get("sheet", {})
+    k_max = float(s.get("scale_max", 1.7))   # верхний предел: текст 17 pt
+    k_min = float(s.get("scale_min", 0.6))   # нижний предел: текст 6 pt
     best: Optional[bytes] = None
-    for size in (10.0, 9.5, 9.0, 8.5, 8.0, 7.5, 7.0, 6.5, 6.0):
+    k = k_max
+    while k >= k_min - 1e-9:
         buf = io.BytesIO()
         c = canvas.Canvas(buf, pagesize=A4)
         c.setTitle(f"Метасознание — цикл {rec['cycle']:05d}")
         c.setAuthor("Метасознание, генеративная инсталляция")
         frame = Frame(margin, margin, width, height, leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0, showBoundary=0)
-        leftover = _flowables(rec, cfg, size, width)
+        leftover = _flowables(rec, cfg, round(k, 3), width)
         frame.addFromList(leftover, c)
         c.showPage()
         c.save()
         best = buf.getvalue()
         if not leftover:
             break
+        k -= 0.05
     out_path.write_bytes(best or b"")
     return out_path
 

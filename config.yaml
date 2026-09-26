@@ -98,6 +98,9 @@ sheet:
   font_bold: fonts/DejaVuSans-Bold.ttf
   font_mono: fonts/DejaVuSansMono.ttf
   title: "МЕТАСОЗНАНИЕ"
+  margin_mm: 16
+  scale_max: 1.7                     # лист масштабируется целиком, чтобы заполнить А4: верхний предел (текст 17 pt)
+  scale_min: 0.6                     # нижний предел для очень длинных текстов (6 pt)
   footer: "Листы архива можно листать и перекладывать. Уносить нельзя."
 
 display:
