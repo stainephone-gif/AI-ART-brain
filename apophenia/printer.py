@@ -20,14 +20,20 @@ from .config import path_dir, resolve
 log = logging.getLogger("apophenia.printer")
 
 
+GDI_IMPORT_ERROR: Optional[str] = None
+
+
 def _gdi_available() -> bool:
+    global GDI_IMPORT_ERROR
     try:
         import pypdfium2  # noqa: F401, PLC0415
         import win32print  # noqa: F401, PLC0415
         import win32ui  # noqa: F401, PLC0415
         from PIL import ImageWin  # noqa: F401, PLC0415
+        GDI_IMPORT_ERROR = None
         return True
-    except ImportError:
+    except ImportError as e:
+        GDI_IMPORT_ERROR = str(e)
         return False
 
 

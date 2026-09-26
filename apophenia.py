@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import logging.handlers
 import sys
 import time
@@ -78,11 +79,18 @@ class Service:
         self.archive = path_dir(cfg, "archive")
         self.rejected = path_dir(cfg, "rejected")
         local = Path(cfg["_root"]) / "config.local.yaml"
+        cfg_name = Path(cfg["_config_path"]).name
+        if cfg_name == "config.local.yaml":
+            cfg_name = "config.yaml"
         log.info("Конфиг: %s%s; корпус: %d текстов; модель: %s; принтер: %s (%s)",
-                 Path(cfg["_config_path"]).name, " + config.local.yaml" if local.exists() else "",
+                 cfg_name, " + config.local.yaml" if local.exists() else "",
                  len(self.corpus), getattr(self.llm, "model", "mock"),
                  cfg["printer"].get("name") if cfg["printer"].get("enabled") else "выключен",
                  "gdi, средствами Windows" if self.queue.backend == "gdi" else "SumatraPDF/команда")
+        from apophenia.printer import GDI_IMPORT_ERROR
+        if os.name == "nt" and self.queue.backend != "gdi" and GDI_IMPORT_ERROR:
+            log.warning("Печать средствами Windows недоступна: %s. Выполните: "
+                        ".venv\\Scripts\\python.exe -m pip install -r requirements.txt", GDI_IMPORT_ERROR)
 
     # -- один цикл ------------------------------------------------------------
     def progress(self, **fields: Any) -> None:
