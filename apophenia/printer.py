@@ -27,8 +27,8 @@ def _gdi_available() -> bool:
     global GDI_IMPORT_ERROR
     try:
         import pypdfium2  # noqa: F401, PLC0415
+        import win32gui  # noqa: F401, PLC0415
         import win32print  # noqa: F401, PLC0415
-        import win32ui  # noqa: F401, PLC0415
         from PIL import ImageWin  # noqa: F401, PLC0415
         GDI_IMPORT_ERROR = None
         return True
@@ -181,44 +181,50 @@ class PrintQueue:
 
 
 def print_pdf_gdi(pdf: Path, printer_name: str, dpi: int = 300, copies: int = 1) -> None:
-    """Печать PDF средствами Windows: страницы растрируются (pypdfium2) и рисуются на принтер через GDI (pywin32).
+    """Печать PDF средствами Windows: страницы растрируются (pypdfium2) и рисуются на принтер через GDI.
 
-    Не зависит от внешних программ и работает с любым драйвером, который умеет печатать картинки.
-    Пакеты: pypdfium2, pillow, pywin32 (ставятся из requirements.txt на Windows).
+    Используются только win32gui и win32print (без win32ui, которому нужна библиотека MFC).
+    Работает с любым драйвером, который умеет печатать картинки. Пакеты: pypdfium2, pillow, pywin32.
     """
     if os.name != "nt":
         raise RuntimeError("печать через GDI доступна только в Windows")
     import pypdfium2 as pdfium  # noqa: PLC0415
+    import win32gui  # noqa: PLC0415
     import win32print  # noqa: PLC0415
-    import win32ui  # noqa: PLC0415
     from PIL import ImageWin  # noqa: PLC0415
 
     name = printer_name
     if not name or name.lower() == "default":
         name = win32print.GetDefaultPrinter()
+    HORZRES, VERTRES = 8, 10
     doc = pdfium.PdfDocument(str(pdf))
-    hdc = win32ui.CreateDC()
-    hdc.CreatePrinterDC(name)
-    HORZRES, VERTRES, PHYSICALWIDTH, PHYSICALHEIGHT, PHYSICALOFFSETX, PHYSICALOFFSETY = 8, 10, 110, 111, 112, 113
-    pw, ph = hdc.GetDeviceCaps(HORZRES), hdc.GetDeviceCaps(VERTRES)
+    hdc = win32gui.CreateDC("WINSPOOL", name, None)
+    if not hdc:
+        doc.close()
+        raise RuntimeError(f"не удалось открыть принтер «{name}»")
+    pw, ph = win32print.GetDeviceCaps(hdc, HORZRES), win32print.GetDeviceCaps(hdc, VERTRES)
+    started = False
     try:
-        hdc.StartDoc(f"Метасознание {pdf.name}")
+        win32print.StartDoc(hdc, (f"Метасознание {pdf.name}", None, None, 0))
+        started = True
         for _ in range(max(1, copies)):
             for page in doc:
                 img = page.render(scale=dpi / 72).to_pil().convert("RGB")
                 ratio = min(pw / img.width, ph / img.height)
                 w, h = int(img.width * ratio), int(img.height * ratio)
                 x, y = (pw - w) // 2, (ph - h) // 2
-                hdc.StartPage()
-                ImageWin.Dib(img).draw(hdc.GetHandleOutput(), (x, y, x + w, y + h))
-                hdc.EndPage()
-        hdc.EndDoc()
+                win32print.StartPage(hdc)
+                ImageWin.Dib(img).draw(hdc, (x, y, x + w, y + h))
+                win32print.EndPage(hdc)
+        win32print.EndDoc(hdc)
+        started = False
     except Exception:
-        try:
-            hdc.AbortDoc()
-        except Exception:  # noqa: BLE001
-            pass
+        if started:
+            try:
+                win32print.AbortDoc(hdc)
+            except Exception:  # noqa: BLE001
+                pass
         raise
     finally:
-        hdc.DeleteDC()
+        win32gui.DeleteDC(hdc)
         doc.close()
