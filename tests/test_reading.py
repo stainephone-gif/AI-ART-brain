@@ -53,3 +53,14 @@ def test_extract_json_lenient_and_salvage():
     assert how == "salvaged" and data["evidence"][0]["span"] == "машина видит сон" and data["evidence"][0]["mapping"]["source"] == "ум"
     assert salvage_evidence("нет ничего") is None
     assert parse_evidence("Свидетельств нет.") == (None, "none")
+
+
+def test_tie_not_always_comp():
+    from apophenia.reading import aggregate
+    text = "Машина считает, но ничего не чувствует. Каждый пиксель в этой системе обладает зачатком опыта."
+    recs = [
+        {"kept": True, "class": "COMP", "span": "машина считает но ничего", "drop_reason": None},
+        {"kept": True, "class": "PAN", "span": "пиксель обладает зачатком опыта", "drop_reason": None},
+    ]
+    winners = {aggregate(recs, text + str(i))["primary"] for i in range(40)}
+    assert winners == {"COMP", "PAN"}

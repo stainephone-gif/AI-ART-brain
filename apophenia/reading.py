@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import random
 from collections import Counter
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -82,10 +84,14 @@ def aggregate(records: List[Dict[str, Any]], text: str) -> Dict[str, Any]:
     tied = [c for c in CLASSES if n_spans[c] == best]
     primary = tied[0]
     if len(tied) > 1:
-        # как в AI-art: при равенстве — по покрытию текста фрагментами
+        # при равенстве — по покрытию текста фрагментами (как в AI-art); при полном равенстве —
+        # случайно с зерном от текста, а не по порядку списка (иначе COMP всегда впереди)
         def coverage(c: str) -> int:
             return sum(len(r["span"].split()) for r in kept if r["class"] == c)
-        primary = max(tied, key=lambda c: (coverage(c), -CLASSES.index(c)))
+        best_cov = max(coverage(c) for c in tied)
+        tied = [c for c in tied if coverage(c) == best_cov]
+        rng = random.Random(hashlib.sha256(text.encode("utf-8")).hexdigest())
+        primary = tied[0] if len(tied) == 1 else rng.choice(tied)
     return {
         "primary": primary,
         "confidence": round(n_spans[primary] / total, 3),

@@ -30,7 +30,7 @@
 {
   "evidence": [
     {
-      "class": "COMP",
+      "class": "<один из классов: COMP, IIT, PRED, GWT, ENACT, PAN, EMERG>",
       "span": "точная цитата из текста",
       "mapping": {"source": "область-источник: что переносится", "target": "область-цель: на что переносится"},
       "level": "explicit | scientific_metaphor | meta_metaphor",

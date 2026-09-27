@@ -9,6 +9,7 @@
   python apophenia.py models              # список моделей GigaChat, доступных по ключу
   python apophenia.py status              # состояние: последний цикл, очередь, расписание
   python apophenia.py probe [id]          # сырой ответ модели на один текст корпуса (отладка призрачных цитат)
+  python apophenia.py stats [папка]       # распределение классов по архиву (по умолчанию archive/; для теста: stats archive_test)
   python apophenia.py run --config config.test.yaml   # тестовый режим (test.bat): циклы подряд, свой архив и принтер
 Флаги: --config путь/к/config.yaml, --mock (заглушка вместо API и принтера), --scenario drift.
 """
@@ -267,6 +268,40 @@ def cmd_probe(svc: Service, text_id: Optional[str]) -> None:
         print(f"  [{r.get('class')}] {tag:<22} совпадение {v.get('token_overlap', '-')}  «{r.get('span', '')[:90]}»")
 
 
+def cmd_stats(cfg: Dict[str, Any], archive_arg: Optional[str]) -> None:
+    """Распределение классов по архиву: первые чтения, все итерации, итоги по исходам, классы призрачных цитат."""
+    from collections import Counter
+    from apophenia import ALL_CLASSES
+    d = Path(archive_arg) if archive_arg else path_dir(cfg, "archive")
+    files = sorted(d.glob("cycle_*.json"))
+    if not files:
+        print(f"В {d} нет циклов")
+        return
+    first, every, final, ghosts, outcomes, lengths = Counter(), Counter(), Counter(), Counter(), Counter(), []
+    for f in files:
+        rec = json.loads(f.read_text(encoding="utf-8"))
+        tr = rec.get("trajectory", [])
+        if tr:
+            first[tr[0]] += 1
+            every.update(tr)
+            final[tr[-1]] += 1
+        o = rec.get("outcome", {}) or {}
+        outcomes[o.get("outcome", "?") + (" " + o.get("class", "") if o.get("class") else "")] += 1
+        ghosts.update(q.get("class", "?") for q in rec.get("ghosts", {}).get("quotes", []))
+        lengths.append(len(tr))
+
+    def row(counter: Counter) -> str:
+        total = sum(counter.values()) or 1
+        return "  ".join(f"{c}:{counter.get(c, 0)} ({100 * counter.get(c, 0) / total:.0f}%)" for c in ALL_CLASSES if counter.get(c, 0))
+
+    print(f"Циклов: {len(files)}; итераций в среднем {sum(lengths) / len(lengths):.1f}")
+    print("Первое чтение:     ", row(first))
+    print("Все итерации:      ", row(every))
+    print("Последнее чтение:  ", row(final))
+    print("Призрачные цитаты: ", row(ghosts))
+    print("Исходы:            ", "  ".join(f"{k}:{v}" for k, v in outcomes.most_common()))
+
+
 def cmd_status(svc: Service) -> None:
     st = svc.state.data
     print(f"Версия {__version__}; последний цикл: {st.get('last_cycle', 0)}; запуск службы: {st.get('started_at')}")
@@ -279,7 +314,7 @@ def cmd_status(svc: Service) -> None:
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description="Метасознание — служба инсталляции")
     ap.add_argument("command", nargs="?", default="run",
-                    choices=["run", "once", "reprint", "render", "test-print", "models", "status", "probe"])
+                    choices=["run", "once", "reprint", "render", "test-print", "models", "status", "probe", "stats"])
     ap.add_argument("arg", nargs="?")
     ap.add_argument("--config", default=None)
     ap.add_argument("--mock", action="store_true", help="заглушка вместо API и принтера")
@@ -288,6 +323,9 @@ def main(argv=None) -> None:
     a = ap.parse_args(argv)
     cfg = load_config(a.config)
     setup_logging(cfg)
+    if a.command == "stats":
+        cmd_stats(cfg, a.arg)
+        return
     if a.command == "models":
         llm = make_llm(cfg)
         print("\n".join(llm.list_models()) if hasattr(llm, "list_models") else "mock")

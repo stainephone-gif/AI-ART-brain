@@ -95,3 +95,17 @@ def load_all(cfg: Dict[str, Any]) -> Dict[str, Prompt]:
     # промпт призрачных цитат; если не задан — тот же промпт, что у классификатора
     out["ghosts"] = load_prompt(cfg, "ghosts") if cfg["prompts"].get("ghosts") else out["theory"]
     return out
+
+
+def class_short_definitions(cfg: Dict[str, Any]) -> str:
+    """Список всех классов по одной строке: код, название и первая строка определения из кодбука."""
+    from . import ALL_CLASSES, CLASS_NAMES_RU  # noqa: PLC0415
+    theory = codebook_sections(load_codebook(cfg)).get("theory", "")
+    lines = []
+    for cls in ALL_CLASSES:
+        m = re.search(rf"### {cls} — [^\n]*\n([^\n]+)", theory)
+        definition = m.group(1).strip() if m else ""
+        if cls == "UND":
+            definition = "ни одной теории в тексте не найдено."
+        lines.append(f"- {cls} ({CLASS_NAMES_RU[cls]}): {definition}")
+    return "\n".join(lines)

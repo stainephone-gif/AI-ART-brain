@@ -13,7 +13,7 @@ from .ghosts import collect_ghosts, format_quotes
 from .llm import BaseLLM, LLMRefusal, parse_evidence
 from .moderation import Moderator
 from .outcomes import detect
-from .prompts import Prompt, class_definition
+from .prompts import Prompt, class_definition, class_short_definitions
 from .reading import aggregate, validate_theory_response
 
 log = logging.getLogger("apophenia.cycle")
@@ -128,7 +128,8 @@ class Engine:
         iterations: List[Dict[str, Any]] = []
         outcome: Optional[Dict[str, Any]] = None
         rw = self.prompts["rewrite"]
-        rw_system = rw.system.replace("{min_words}", self.words["min_words"]).replace("{max_words}", self.words["max_words"])
+        rw_system = (rw.system.replace("{min_words}", self.words["min_words"]).replace("{max_words}", self.words["max_words"])
+                     .replace("{theories}", class_short_definitions(self.cfg)))
         while True:
             n = len(iterations) + 1
             progress(phase="reading", cycle=cycle_no, quotes=quotes, iterations=iterations, text=text, iteration=n)
