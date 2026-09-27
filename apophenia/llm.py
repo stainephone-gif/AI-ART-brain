@@ -36,8 +36,22 @@ class LLMResponse:
     finish_reason: Optional[str] = None
 
 
+_TRAILING_COMMA_RE = re.compile(r",(\s*[}\]])")
+
+
+def _loads_lenient(candidate: str) -> Optional[Dict[str, Any]]:
+    """json.loads с поблажками: управляющие символы внутри строк, лишние запятые перед } и ]."""
+    for attempt in (candidate, _TRAILING_COMMA_RE.sub(r"\1", candidate)):
+        try:
+            obj = json.loads(attempt, strict=False)
+            return obj if isinstance(obj, dict) else None
+        except json.JSONDecodeError:
+            continue
+    return None
+
+
 def extract_json(content: str) -> Optional[Dict[str, Any]]:
-    """Первый сбалансированный JSON-объект из ответа (из AI-art common.py)."""
+    """Первый сбалансированный JSON-объект из ответа (из AI-art common.py), с поблажками к огрехам модели."""
     if not content:
         return None
     s = content.strip()
@@ -64,14 +78,52 @@ def extract_json(content: str) -> Optional[Dict[str, Any]]:
         elif ch == "}":
             depth -= 1
             if depth == 0:
-                try:
-                    return json.loads(s[start:i + 1])
-                except json.JSONDecodeError:
-                    break
-    try:
-        return json.loads(s[start:])
-    except json.JSONDecodeError:
+                obj = _loads_lenient(s[start:i + 1])
+                if obj is not None:
+                    return obj
+                break
+    obj = _loads_lenient(s[start:])
+    if obj is not None:
+        return obj
+    # последняя попытка: обрезать по последней закрывающей скобке (ответ мог оборваться на хвосте)
+    end = s.rfind("}")
+    return _loads_lenient(s[start:end + 1]) if end > start else None
+
+
+_FIELD_RES = {
+    "class": re.compile(r'"class"\s*:\s*"([A-Za-z]+)"'),
+    "span": re.compile(r'"span"\s*:\s*"((?:[^"\\]|\\.)*)"', re.S),
+    "source": re.compile(r'"source"\s*:\s*"((?:[^"\\]|\\.)*)"', re.S),
+    "target": re.compile(r'"target"\s*:\s*"((?:[^"\\]|\\.)*)"', re.S),
+    "level": re.compile(r'"level"\s*:\s*"([a-z_]+)"'),
+}
+
+
+def salvage_evidence(content: str) -> Optional[Dict[str, Any]]:
+    """Если JSON не разбирается: вытащить фрагменты регулярными выражениями, по одному на каждое поле class."""
+    if not content or '"class"' not in content:
         return None
+    parts = re.split(r'(?="class"\s*:)', content)[1:]
+    items = []
+    for part in parts:
+        def field(name: str) -> str:
+            m = _FIELD_RES[name].search(part)
+            return m.group(1).replace('\\"', '"').strip() if m else ""
+        cls, span = field("class"), field("span")
+        if not cls or not span:
+            continue
+        items.append({"class": cls, "span": span, "level": field("level") or None, "exclusion_checked": True,
+                      "mapping": {"source": field("source"), "target": field("target")}, "reasoning": "salvaged"})
+    return {"evidence": items, "notes": "salvaged: JSON не разобран, фрагменты извлечены регулярными выражениями"} if items else None
+
+
+def parse_evidence(content: str) -> tuple[Optional[Dict[str, Any]], str]:
+    """(данные, способ): json | salvaged | none."""
+    data = extract_json(content)
+    if isinstance(data, dict) and isinstance(data.get("evidence"), list):
+        return data, "json"
+    data = salvage_evidence(content)
+    return (data, "salvaged") if data else (None, "none")
 
 
 def clean_credentials(raw: str) -> str:

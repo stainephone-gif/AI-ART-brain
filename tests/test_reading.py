@@ -40,3 +40,16 @@ def test_duplicates_of_same_class_are_dropped():
     resp = {"evidence": [ev("COMP", "соавтор, который мыслит образами"), ev("COMP", "который мыслит образами")]}
     records, _ = validate_theory_response(resp, TEXT, VCFG)
     assert [r["drop_reason"] for r in records] == [None, "duplicate"]
+
+
+def test_extract_json_lenient_and_salvage():
+    from apophenia.llm import extract_json, parse_evidence, salvage_evidence
+    # перенос строки внутри строки и лишняя запятая
+    raw = '{"evidence": [{"class": "COMP", "span": "первая\nстрока", "mapping": {"source": "a", "target": "b"},}], "notes": "x",}'
+    assert extract_json(raw)["evidence"][0]["span"] == "первая\nстрока"
+    # обрыв ответа: JSON не закрыт → регулярки
+    raw2 = '{"evidence": [{"class": "PRED", "span": "машина видит сон", "mapping": {"source": "ум", "target": "машина"}, "level": "meta_metaphor"}, {"class": "PAN", "span": "тонер чувствует'
+    data, how = parse_evidence(raw2)
+    assert how == "salvaged" and data["evidence"][0]["span"] == "машина видит сон" and data["evidence"][0]["mapping"]["source"] == "ум"
+    assert salvage_evidence("нет ничего") is None
+    assert parse_evidence("Свидетельств нет.") == (None, "none")

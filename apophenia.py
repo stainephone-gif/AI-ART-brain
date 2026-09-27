@@ -239,7 +239,7 @@ def cmd_test_print(svc: Service) -> None:
 
 def cmd_probe(svc: Service, text_id: Optional[str]) -> None:
     """Сырой ответ модели на один текст корпуса промптом классификатора при температуре призрачных цитат."""
-    from apophenia.llm import extract_json
+    from apophenia.llm import parse_evidence
     from apophenia.reading import validate_theory_response
     corpus = svc.corpus
     t = next((x for x in corpus if text_id and str(x["id"]) == str(text_id)), None) or corpus[0]
@@ -255,8 +255,8 @@ def cmd_probe(svc: Service, text_id: Optional[str]) -> None:
     print("СЫРОЙ ОТВЕТ:")
     print(resp.content)
     print("-" * 60)
-    data = extract_json(resp.content)
-    print("JSON разобран:", data is not None)
+    data, how = parse_evidence(resp.content)
+    print("Разбор ответа:", {"json": "JSON разобран", "salvaged": "JSON не разобран, фрагменты извлечены из текста", "none": "не удалось"}[how])
     vcfg = {**svc.cfg.get("verification", {}), **(svc.cfg.get("ghosts", {}).get("verification") or {})}
     records, stats = validate_theory_response(data, t["text"], vcfg)
     print(f"фрагментов {stats['n_total']}, в тексте есть {stats['n_kept']}, призрачных {stats['dropped'].get('unverified', 0)}, "

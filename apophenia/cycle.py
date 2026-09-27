@@ -10,7 +10,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from . import CLASS_NAMES_RU, __version__
 from .ghosts import collect_ghosts, format_quotes
-from .llm import BaseLLM, LLMRefusal, extract_json
+from .llm import BaseLLM, LLMRefusal, parse_evidence
 from .moderation import Moderator
 from .outcomes import detect
 from .prompts import Prompt, class_definition
@@ -77,7 +77,9 @@ class Engine:
         theory = self.prompts["theory"]
         try:
             resp = self.llm.complete("classify", theory.system, theory.user(text=text), float(self.temps.get("classify", 0.0)))
-            data = extract_json(resp.content)
+            data, how = parse_evidence(resp.content)
+            if how != "json":
+                log.warning("Чтение: разбор ответа классификатора: %s", how)
         except LLMRefusal:
             data = {"evidence": [], "notes": "refusal"}
         records, stats = validate_theory_response(data, text, self.cfg.get("verification", {}))

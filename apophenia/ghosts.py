@@ -7,7 +7,7 @@ import logging
 from typing import Any, Dict, List
 
 from .corpus import pick_texts
-from .llm import BaseLLM, LLMRefusal, extract_json
+from .llm import BaseLLM, LLMRefusal, parse_evidence
 from .prompts import Prompt
 from .reading import validate_theory_response
 
@@ -29,7 +29,9 @@ def collect_ghosts(cfg: Dict[str, Any], llm: BaseLLM, theory: Prompt, corpus: Li
         except LLMRefusal as e:
             log.warning("Текст %s: отказ модели (%s), пропускаем", t["id"], e)
             continue
-        data = extract_json(resp.content)
+        data, how = parse_evidence(resp.content)
+        if how == "salvaged":
+            log.warning("Текст %s: JSON не разобран, фрагменты извлечены из текста ответа", t["id"])
         records, stats = validate_theory_response(data, t["text"], vcfg)
         ghosts = [r for r in records if r.get("drop_reason") == "unverified"]
         reading = {"text_id": t["id"], "title": t["title"], "source": t["source"],
@@ -37,10 +39,10 @@ def collect_ghosts(cfg: Dict[str, Any], llm: BaseLLM, theory: Prompt, corpus: Li
                    "dropped": stats["dropped"], "finish_reason": resp.finish_reason}
         if stats["n_total"] == 0:
             # ничего не нашлось: сохраняем начало сырого ответа, чтобы понять, JSON это или отказ
-            reading["raw_preview"] = (resp.content or "")[:600]
-            reading["json_parsed"] = data is not None
-            log.warning("Текст %s: 0 фрагментов; JSON %s; ответ: %s", t["id"],
-                        "разобран" if data is not None else "НЕ разобран", (resp.content or "")[:200].replace("\n", " "))
+            reading["raw_preview"] = (resp.content or "")[:2000]
+            reading["parsed"] = how
+            log.warning("Текст %s: 0 фрагментов; разбор: %s; ответ: %s", t["id"], how,
+                        (resp.content or "")[:200].replace("\n", " "))
         readings.append(reading)
         for r in ghosts:
             quotes.append({
