@@ -55,6 +55,7 @@ UND (свидетельств ни одной теории нет) не стаб
 ```
 apophenia.py            служба: run / once / reprint / render / test-print / models / status
 start.bat, stop.bat     ручной запуск и остановка службы вместе с экраном (Windows)
+start_open.bat          режим открытия: то же самое, но лист каждые 10 минут (config.open.yaml)
 test.bat, config.test.yaml   тестовый режим: циклы подряд, свой архив и принтер, протоколы, отладочный экран
 config.yaml             все настройки (модель, пороги, расписание, принтер, экран)
 config.local.yaml       локальные переопределения этого компьютера (не в git), образец config.local.example.yaml
