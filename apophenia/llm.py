@@ -14,7 +14,7 @@ import re
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from .config import resolve
 
@@ -117,7 +117,7 @@ def salvage_evidence(content: str) -> Optional[Dict[str, Any]]:
     return {"evidence": items, "notes": "salvaged: JSON не разобран, фрагменты извлечены регулярными выражениями"} if items else None
 
 
-def parse_evidence(content: str) -> tuple[Optional[Dict[str, Any]], str]:
+def parse_evidence(content: str) -> Tuple[Optional[Dict[str, Any]], str]:
     """(данные, способ): json | salvaged | none."""
     data = extract_json(content)
     if isinstance(data, dict) and isinstance(data.get("evidence"), list):
