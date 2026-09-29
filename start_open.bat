@@ -9,7 +9,8 @@ if not exist ".venv\Scripts\python.exe" (
   pause
   exit /b 1
 )
-start "Metasoznanie service" /min ".venv\Scripts\python.exe" apophenia.py run --config config.open.yaml
+rem pythonw.exe: no console window; the log is in logs\apophenia.log
+start "Metasoznanie service" ".venv\Scripts\pythonw.exe" apophenia.py run --config config.open.yaml
 timeout /t 15 /nobreak >nul
 set EDGE="C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 if not exist %EDGE% set EDGE="C:\Program Files\Microsoft\Edge\Application\msedge.exe"

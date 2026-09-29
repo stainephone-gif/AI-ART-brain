@@ -45,16 +45,17 @@ log = logging.getLogger("apophenia")
 
 
 def setup_logging(cfg: Dict[str, Any]) -> None:
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     logs = path_dir(cfg, "logs")
     fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
     root = logging.getLogger()
     root.setLevel(logging.INFO)
     root.handlers.clear()
-    sh = logging.StreamHandler(sys.stdout)
-    sh.setFormatter(fmt)
-    root.addHandler(sh)
+    if sys.stdout is not None:  # под pythonw.exe консоли нет, пишем только в файл
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sh = logging.StreamHandler(sys.stdout)
+        sh.setFormatter(fmt)
+        root.addHandler(sh)
     fh = logging.handlers.RotatingFileHandler(logs / "apophenia.log", maxBytes=5_000_000, backupCount=5, encoding="utf-8")
     fh.setFormatter(fmt)
     root.addHandler(fh)

@@ -4,4 +4,5 @@ cd /d "%~dp0\.."
 chcp 65001 >nul
 set PYTHONIOENCODING=utf-8
 set PYTHONUTF8=1
-".venv\Scripts\python.exe" apophenia.py run
+rem pythonw.exe: no console window; the log is in logs\apophenia.log
+".venv\Scripts\pythonw.exe" apophenia.py run
